@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
+import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { Icons } from './constants';
 // Lazy loaded components for performance
 const Dashboard = React.lazy(() => import('./components/Dashboard'));
@@ -37,13 +38,18 @@ const App: React.FC = () => {
   const { 
     user, 
     leads, 
-    activeView, 
-    setActiveView, 
     updateLead, 
     fetchLeads, 
     addLead,
     logout 
   } = useStore();
+
+  // Router Hooks
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Derived State for UI Highlighting
+  const currentPath = location.pathname === '/' ? 'dashboard' : location.pathname.substring(1);
 
   const [darkMode, setDarkMode] = useLocalStorage<boolean>('theme_dark', false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
@@ -121,24 +127,16 @@ const App: React.FC = () => {
   };
 
   const handleAddLeads = async (newLeads: Lead[]) => {
-      // Add one by one to simulate service calls (or bulk if service supports)
       for(const lead of newLeads) {
           await addLead(lead);
       }
   }
 
-  // View Router
-  const renderView = () => {
-      switch(activeView) {
-          case 'dashboard': return <Dashboard />;
-          case 'leads': return <LeadList leads={leads} onSelect={setSelectedLead} onAddLeads={handleAddLeads} />;
-          case 'tools': return <ToolsHub />;
-          case 'birthub': return <BirthubEngine onSaveLead={(lead) => addLead(lead)} />;
-          case 'ailab': return <AILab />;
-          case 'validation': return <CNPJValidator />;
-          default: return <NotFound onReset={() => setActiveView('dashboard')} />;
-      }
-  };
+  const handleNavigate = (viewId: string) => {
+      const path = viewId === 'dashboard' ? '/' : `/${viewId}`;
+      navigate(path);
+      setMobileMenuOpen(false);
+  }
 
   // --- AUTH GUARD ---
   if (!user) {
@@ -166,12 +164,12 @@ const App: React.FC = () => {
       {mobileMenuOpen && (
           <div className="md:hidden fixed inset-0 bg-white dark:bg-[#0B1120] z-40 p-8 flex flex-col gap-6 animate-in slide-in-from-right">
               <div className="text-2xl font-black mb-6">Menu de Navegação</div>
-              <button onClick={() => { setActiveView('dashboard'); setMobileMenuOpen(false); }} className="text-xl font-bold p-4 bg-slate-50 dark:bg-white/5 rounded-2xl">Dashboard</button>
-              <button onClick={() => { setActiveView('birthub'); setMobileMenuOpen(false); }} className="text-xl font-bold p-4 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 rounded-2xl">BIRTHUB AI v2.1</button>
-              <button onClick={() => { setActiveView('leads'); setMobileMenuOpen(false); }} className="text-xl font-bold p-4 bg-slate-50 dark:bg-white/5 rounded-2xl">Leads & IA</button>
-              <button onClick={() => { setActiveView('tools'); setMobileMenuOpen(false); }} className="text-xl font-bold p-4 bg-slate-50 dark:bg-white/5 rounded-2xl">Ferramentas (100+)</button>
-              <button onClick={() => { setActiveView('ailab'); setMobileMenuOpen(false); }} className="text-xl font-bold p-4 bg-slate-50 dark:bg-white/5 rounded-2xl">Laboratório IA</button>
-              <button onClick={() => { setActiveView('validation'); setMobileMenuOpen(false); }} className="text-xl font-bold p-4 bg-slate-50 dark:bg-white/5 rounded-2xl">Validação</button>
+              <button onClick={() => handleNavigate('dashboard')} className="text-xl font-bold p-4 bg-slate-50 dark:bg-white/5 rounded-2xl">Dashboard</button>
+              <button onClick={() => handleNavigate('birthub')} className="text-xl font-bold p-4 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 rounded-2xl">BIRTHUB AI v2.1</button>
+              <button onClick={() => handleNavigate('leads')} className="text-xl font-bold p-4 bg-slate-50 dark:bg-white/5 rounded-2xl">Leads & IA</button>
+              <button onClick={() => handleNavigate('tools')} className="text-xl font-bold p-4 bg-slate-50 dark:bg-white/5 rounded-2xl">Ferramentas (100+)</button>
+              <button onClick={() => handleNavigate('ailab')} className="text-xl font-bold p-4 bg-slate-50 dark:bg-white/5 rounded-2xl">Laboratório IA</button>
+              <button onClick={() => handleNavigate('validation')} className="text-xl font-bold p-4 bg-slate-50 dark:bg-white/5 rounded-2xl">Validação</button>
               <button onClick={() => setDarkMode(!darkMode)} className="mt-auto p-4 border rounded-2xl">Alternar Tema</button>
               <button onClick={logout} className="p-4 bg-red-50 text-red-600 rounded-2xl font-bold">Sair</button>
           </div>
@@ -224,7 +222,7 @@ const App: React.FC = () => {
             <nav className="space-y-4">
                 {[
                     { id: 'dashboard', icon: <Icons.Dashboard />, label: 'Dashboard' },
-                    { id: 'birthub', icon: <Icons.Target />, label: 'BIRTHUB AI v2.1' }, // Added Birthub here
+                    { id: 'birthub', icon: <Icons.Target />, label: 'BIRTHUB AI v2.1' },
                     { id: 'leads', icon: <Icons.Leads />, label: 'Leads & IA' },
                     { id: 'tools', icon: <Icons.Sparkles />, label: '100 Power Tools' },
                     { id: 'ailab', icon: <Icons.Lab />, label: 'Laboratório IA' },
@@ -232,16 +230,16 @@ const App: React.FC = () => {
                 ].map((item) => (
                     <button 
                         key={item.id}
-                        onClick={() => setActiveView(item.id as any)}
+                        onClick={() => handleNavigate(item.id)}
                         title={sidebarCollapsed ? item.label : ''}
-                        className={`group flex items-center ${sidebarCollapsed ? 'justify-center px-0' : 'px-6'} py-5 w-full text-lg font-bold rounded-[2rem] transition-all duration-300 relative overflow-hidden ${activeView === item.id ? 'text-white shadow-xl shadow-purple-900/20' : 'text-slate-500 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-white/5 hover:pl-8'} ${item.id === 'birthub' && activeView !== 'birthub' ? 'text-indigo-500 dark:text-indigo-400' : ''}`}
+                        className={`group flex items-center ${sidebarCollapsed ? 'justify-center px-0' : 'px-6'} py-5 w-full text-lg font-bold rounded-[2rem] transition-all duration-300 relative overflow-hidden ${currentPath === item.id ? 'text-white shadow-xl shadow-purple-900/20' : 'text-slate-500 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-white/5 hover:pl-8'} ${item.id === 'birthub' && currentPath !== 'birthub' ? 'text-indigo-500 dark:text-indigo-400' : ''}`}
                     >
-                        {activeView === item.id && <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600"></div>}
+                        {currentPath === item.id && <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600"></div>}
                         <span className="relative z-10 flex items-center gap-4">
                             {item.icon} 
                             {!sidebarCollapsed && item.label}
                         </span>
-                        {item.id === 'birthub' && !sidebarCollapsed && activeView !== 'birthub' && (
+                        {item.id === 'birthub' && !sidebarCollapsed && currentPath !== 'birthub' && (
                             <span className="absolute right-4 w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></span>
                         )}
                     </button>
@@ -277,9 +275,9 @@ const App: React.FC = () => {
         <div className="p-6 md:p-10 max-w-[1800px] mx-auto relative z-10">
           
           <div className="mb-6 flex items-center gap-2 text-sm text-slate-400 font-medium animate-in fade-in slide-in-from-left">
-              <span className="hover:text-purple-500 cursor-pointer" onClick={() => setActiveView('dashboard')}>Home</span>
+              <span className="hover:text-purple-500 cursor-pointer" onClick={() => handleNavigate('dashboard')}>Home</span>
               <span>/</span>
-              <span className="text-slate-600 dark:text-white capitalize">{activeView === 'ailab' ? 'Laboratório IA' : activeView === 'tools' ? 'Ferramentas de Vendas' : activeView === 'birthub' ? 'Birthub AI v2.1' : activeView}</span>
+              <span className="text-slate-600 dark:text-white capitalize">{currentPath === 'ailab' ? 'Laboratório IA' : currentPath === 'tools' ? 'Ferramentas de Vendas' : currentPath === 'birthub' ? 'Birthub AI v2.1' : currentPath}</span>
           </div>
 
           <Suspense fallback={
@@ -295,7 +293,15 @@ const App: React.FC = () => {
               </div>
             </div>
           }>
-            {renderView()}
+             <Routes>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/leads" element={<LeadList leads={leads} onSelect={setSelectedLead} onAddLeads={handleAddLeads} />} />
+                <Route path="/tools" element={<ToolsHub />} />
+                <Route path="/birthub" element={<BirthubEngine onSaveLead={(lead) => addLead(lead)} />} />
+                <Route path="/ailab" element={<AILab />} />
+                <Route path="/validation" element={<CNPJValidator />} />
+                <Route path="*" element={<NotFound onReset={() => navigate('/')} />} />
+             </Routes>
           </Suspense>
 
         </div>

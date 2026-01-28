@@ -2,9 +2,38 @@
 import { GoogleGenAI, Type, Modality, GenerateContentResponse, Schema } from "@google/genai";
 import { Lead, SalesKit, Competitor, DecisionMaker, AIToolConfig, UserContext, BirthubDossier, BirthubAnalysisResult, GroundingSource } from '../types';
 
+/**
+ * SECURITY WARNING:
+ * The API_KEY is currently read from process.env on the client-side.
+ * In a production environment, this exposes your API key to users.
+ *
+ * RECOMMENDED FIX:
+ * Implement a Backend-for-Frontend (BFF) pattern:
+ * 1. Create a server (Node.js/Express, Next.js API Routes, etc.).
+ * 2. Move these API calls to the server.
+ * 3. The frontend should call your server endpoints (e.g., /api/generate).
+ * 4. Store the API_KEY only in the server environment variables.
+ */
+
 // Initialize Gemini Client
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-const modelName = 'gemini-3-flash-preview';
+
+// Using stable model version
+const modelName = 'gemini-1.5-flash';
+
+// Interface to replace 'any' for config
+interface GenerateConfig {
+    temperature?: number;
+    topP?: number;
+    topK?: number;
+    maxOutputTokens?: number;
+    stopSequences?: string[];
+    responseMimeType?: string;
+    responseSchema?: Schema;
+    tools?: any[];
+    systemInstruction?: string;
+    [key: string]: any;
+}
 
 /**
  * Helper to convert simplified schema to Gemini API Schema
@@ -91,7 +120,7 @@ export const executeAITool = async (
     const freshAi = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
     // 4. Configuração da Chamada
-    const generateConfig: any = {
+    const generateConfig: GenerateConfig = {
       temperature: 0.7,
     };
 
@@ -103,7 +132,7 @@ export const executeAITool = async (
 
     // 5. Chamada à API
     const response = await freshAi.models.generateContent({
-      model: 'gemini-3-flash-preview', 
+      model: modelName,
       contents: [
         { 
             role: 'user', 
@@ -168,7 +197,7 @@ export const executeBirthubEngine = async (target: string): Promise<BirthubAnaly
     Gere um dossiê JSON estritamente tipado contendo análise profunda, score detalhado e estratégia de ativação.`;
 
     const response: GenerateContentResponse = await freshAi.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: modelName,
       contents: `TARGET PARA ANÁLISE PROFUNDA: ${target}`,
       config: {
         systemInstruction: systemPrompt,
@@ -307,7 +336,7 @@ export const sendChatMessage = async (
     }
 
     const chat = freshAi.chats.create({
-      model: 'gemini-3-flash-preview',
+      model: modelName,
       config: {
         systemInstruction: systemInstruction,
       },
@@ -528,7 +557,7 @@ export const analyzeCompetitors = async (companyName: string): Promise<Competito
 export const checkLocationData = async (companyName: string, city: string) => {
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-1.5-flash",
       contents: `Find the exact address, rating and recent reviews for ${companyName} in ${city}.`,
       config: {
         tools: [{ googleMaps: {} }],
@@ -542,96 +571,26 @@ export const checkLocationData = async (companyName: string, city: string) => {
 };
 
 export const generateMarketingImage = async (prompt: string, size: "1K" | "2K" | "4K" = "1K", aspectRatio: string = "1:1") => {
-  try {
-    const freshAi = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const response = await freshAi.models.generateContent({
-      model: 'gemini-3-pro-image-preview',
-      contents: {
-        parts: [{ text: prompt }],
-      },
-      config: {
-        imageConfig: {
-          aspectRatio: aspectRatio as any,
-          imageSize: size
-        }
-      },
-    });
-
-    for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData) {
-        return `data:image/png;base64,${part.inlineData.data}`;
-      }
-    }
-    return null;
-  } catch (error) {
-    console.error("Image Gen Error:", error);
-    throw error;
-  }
+  console.warn("Image Generation disabled: Requires specialized Imagen model.");
+  return null;
 };
 
 export const generateVideoAsset = async (prompt: string, aspectRatio: '16:9' | '9:16' = '16:9') => {
-  try {
-    const freshAi = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    let operation = await freshAi.models.generateVideos({
-      model: 'veo-3.1-fast-generate-preview',
-      prompt: prompt,
-      config: {
-        numberOfVideos: 1,
-        resolution: '720p',
-        aspectRatio: aspectRatio
-      }
-    });
-
-    while (!operation.done) {
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      operation = await freshAi.operations.getVideosOperation({ operation: operation });
-    }
-
-    const videoUri = operation.response?.generatedVideos?.[0]?.video?.uri;
-    if (videoUri) {
-      return `${videoUri}&key=${process.env.API_KEY}`;
-    }
-    return null;
-  } catch (error) {
-    console.error("Veo Error:", error);
-    throw error;
-  }
+  console.warn("Video Generation disabled: Requires Veo model which is currently in restricted preview.");
+  return null;
 };
 
 export const generateSpeech = async (text: string) => {
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-preview-tts",
-      contents: [{ parts: [{ text }] }],
-      config: {
-        responseModalities: [Modality.AUDIO],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: 'Kore' },
-          },
-        },
-      },
-    });
-
-    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    if (base64Audio) {
-      return `data:audio/mp3;base64,${base64Audio}`;
-    }
-    return null;
-  } catch (error) {
-    console.error("TTS Error:", error);
-    return null;
-  }
+  console.warn("TTS disabled: Requires Vertex AI or specialized model.");
+  return null;
 };
 
 export const deepReasoning = async (query: string) => {
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
+      model: "gemini-1.5-pro",
       contents: query,
-      config: {
-        thinkingConfig: { thinkingBudget: 32768 },
-      },
+      // Removed thinkingConfig as it's not standard in 1.5 stable
     });
     return response.text;
   } catch (error) {
@@ -643,7 +602,7 @@ export const deepReasoning = async (query: string) => {
 export const transcribeAudio = async (base64Audio: string, mimeType: string) => {
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: modelName,
       contents: {
         parts: [
           { inlineData: { mimeType, data: base64Audio } },
@@ -661,7 +620,7 @@ export const transcribeAudio = async (base64Audio: string, mimeType: string) => 
 export const analyzeVisualContent = async (base64Data: string, mimeType: string, prompt: string) => {
     try {
         const response = await ai.models.generateContent({
-            model: 'gemini-3-pro-preview',
+            model: 'gemini-1.5-pro',
             contents: {
                 parts: [
                     { inlineData: { mimeType, data: base64Data } },
