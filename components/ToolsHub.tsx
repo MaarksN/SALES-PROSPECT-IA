@@ -68,6 +68,7 @@ const VoiceInput: React.FC<VoiceInputProps> = ({ onTranscript }) => {
       onClick={startListening}
       className={`absolute right-3 bottom-3 p-2 rounded-full transition-colors ${isListening ? 'bg-red-500 text-white animate-pulse' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 hover:text-indigo-500'}`}
       title="Falar para digitar"
+      aria-label="Ativar reconhecimento de voz"
     >
       <Icons.Mic />
     </button>
@@ -226,7 +227,7 @@ const ToolsHub: React.FC = () => {
               <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-lg shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
                   <div className="p-6 bg-gradient-to-r from-indigo-600 to-purple-600 text-white flex justify-between items-center">
                       <h3 className="font-bold text-xl flex items-center gap-2"><Icons.Brain /> Ensinar a IA</h3>
-                      <button onClick={() => setShowContextModal(false)} className="hover:bg-white/20 p-2 rounded-full"><Icons.X /></button>
+                      <button onClick={() => setShowContextModal(false)} className="hover:bg-white/20 p-2 rounded-full" aria-label="Fechar Modal"><Icons.X /></button>
                   </div>
                   <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
                       <p className="text-sm text-slate-500 dark:text-slate-400">
