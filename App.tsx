@@ -41,6 +41,7 @@ const App: React.FC = () => {
     updateLead, 
     fetchLeads, 
     addLead,
+    addLeads,
     logout 
   } = useStore();
 
@@ -127,9 +128,7 @@ const App: React.FC = () => {
   };
 
   const handleAddLeads = async (newLeads: Lead[]) => {
-      for(const lead of newLeads) {
-          await addLead(lead);
-      }
+      await addLeads(newLeads);
   }
 
   const handleNavigate = (viewId: string) => {

@@ -52,6 +52,24 @@ export const leadService = {
         }
     },
 
+    async createLeads(leads: Lead[]): Promise<Lead[]> {
+        if (isSupabaseConfigured()) {
+            const { data, error } = await supabase
+                .from('leads')
+                .insert(leads)
+                .select();
+
+            if (error) throw error;
+            return data as any;
+        } else {
+            await delay(500);
+            const currentLeads = await this.fetchLeads();
+            const newLeadsList = [...leads, ...currentLeads];
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newLeadsList));
+            return leads;
+        }
+    },
+
     async updateLead(lead: Lead): Promise<Lead> {
         if (isSupabaseConfigured()) {
             const { data, error } = await supabase

@@ -15,6 +15,7 @@ interface AppState {
     // Actions
     fetchLeads: () => Promise<void>;
     addLead: (lead: Lead) => Promise<void>;
+    addLeads: (leads: Lead[]) => Promise<void>;
     updateLead: (lead: Lead) => Promise<void>;
     login: (email: string) => Promise<void>;
     logout: () => Promise<void>;
@@ -112,6 +113,26 @@ export const useStore = create<AppState>((set, get) => ({
             } catch (error) {
                 set({ leads: currentLeads });
                 toast.error("Erro ao salvar lead");
+            }
+        } catch (e) {
+            // Credit error handled in decrementCredits
+        }
+    },
+
+    addLeads: async (leads: Lead[]) => {
+        try {
+            get().decrementCredits(leads.length * 2);
+
+            const previousLeads = get().leads;
+            // Optimistic Update
+            set({ leads: [...leads, ...previousLeads] });
+
+            try {
+                await leadService.createLeads(leads);
+                toast.success(`${leads.length} leads salvos com sucesso!`);
+            } catch (error) {
+                set({ leads: previousLeads });
+                toast.error("Erro ao salvar leads");
             }
         } catch (e) {
             // Credit error handled in decrementCredits
