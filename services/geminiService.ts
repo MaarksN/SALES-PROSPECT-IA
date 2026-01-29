@@ -116,9 +116,6 @@ export const executeAITool = async (
       IMPORTANTE: Adapte a resposta para refletir este contexto e tom de voz.`;
     }
 
-    // 3. Instancia novo cliente
-    const freshAi = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
     // 4. Configuração da Chamada
     const generateConfig: GenerateConfig = {
       temperature: 0.7,
@@ -131,7 +128,7 @@ export const executeAITool = async (
     }
 
     // 5. Chamada à API
-    const response = await freshAi.models.generateContent({
+    const response = await ai.models.generateContent({
       model: modelName,
       contents: [
         { 
@@ -168,8 +165,6 @@ export const executeAITool = async (
  */
 export const executeBirthubEngine = async (target: string): Promise<BirthubAnalysisResult | null> => {
   try {
-    const freshAi = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    
     const systemPrompt = `Você é o Birthub AI v2.1, o Agente de Prospecção Comercial B2B autônomo.
 
     MISSÃO:
@@ -196,7 +191,7 @@ export const executeBirthubEngine = async (target: string): Promise<BirthubAnaly
     SAÍDA:
     Gere um dossiê JSON estritamente tipado contendo análise profunda, score detalhado e estratégia de ativação.`;
 
-    const response: GenerateContentResponse = await freshAi.models.generateContent({
+    const response: GenerateContentResponse = await ai.models.generateContent({
       model: modelName,
       contents: `TARGET PARA ANÁLISE PROFUNDA: ${target}`,
       config: {
@@ -328,14 +323,12 @@ export const sendChatMessage = async (
   userContext?: UserContext
 ) => {
   try {
-    const freshAi = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    
     let systemInstruction = "Você é um assistente de vendas de elite. Ajude o usuário a vender mais, superar objeções e criar estratégias.";
     if (userContext) {
       systemInstruction += `\n\nContexto: Você trabalha para a empresa ${userContext.myCompany}, vendendo ${userContext.myProduct}. Use um tom ${userContext.toneOfVoice}.`;
     }
 
-    const chat = freshAi.chats.create({
+    const chat = ai.chats.create({
       model: modelName,
       config: {
         systemInstruction: systemInstruction,
