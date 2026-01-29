@@ -42,6 +42,7 @@ export interface ScoringBreakdown {
 
 export interface Lead {
   id: string;
+  userId?: string; // Owner of the lead (for RLS)
   companyName: string;
   cnpj?: string;
   sector?: string;

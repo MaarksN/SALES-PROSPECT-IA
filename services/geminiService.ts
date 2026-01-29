@@ -1,6 +1,7 @@
 
 import { Type, GenerateContentResponse, Schema } from "@google/genai";
 import { Lead, SalesKit, Competitor, DecisionMaker, AIToolConfig, UserContext, BirthubDossier, BirthubAnalysisResult, GroundingSource } from '../types';
+import { supabase } from '../lib/supabase';
 
 /**
  * SECURITY UPDATE:
@@ -32,11 +33,20 @@ interface GenerateConfig {
  */
 const callGeminiAPI = async (model: string, contents: any, config?: GenerateConfig): Promise<any> => {
     try {
+        // 1. Get Session Token for Security
+        const { data: { session } } = await supabase.auth.getSession();
+
+        const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+        };
+
+        if (session?.access_token) {
+            headers['Authorization'] = `Bearer ${session.access_token}`;
+        }
+
         const response = await fetch('/api/generate', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers: headers,
             body: JSON.stringify({
                 model,
                 contents,
