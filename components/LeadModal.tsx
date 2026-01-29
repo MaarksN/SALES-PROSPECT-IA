@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Lead } from '../types';
 import { enrichDecisionMakers, generateSalesKit, analyzeCompetitors, checkLocationData } from '../services/geminiService';
 import { enrichmentService } from '../services/enrichmentService';
+import { autopilotService } from '../services/autopilotService';
 import { Icons } from '../constants';
 import { Skeleton } from './Skeleton';
 import { useStore } from '../store/useStore';
@@ -42,6 +43,23 @@ const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onUpdate }) => {
     } finally {
         setLoading(false);
     }
+  };
+
+  const handleAutopilot = async () => {
+      if (!lead.email) {
+          toast.error("Lead sem email para Autopilot.");
+          return;
+      }
+      try {
+          toast.loading("Iniciando Autopilot...");
+          await autopilotService.queueWarmUpEmail(lead);
+          toast.dismiss();
+          toast.success("Autopilot Ativado: Email de Warm-up na fila!");
+          const updated = { ...lead, status: 'contacted' as const };
+          onUpdate(updated);
+      } catch (e) {
+          toast.error("Falha ao iniciar Autopilot");
+      }
   };
 
   const handleRealValidation = async () => {
@@ -429,13 +447,24 @@ const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onUpdate }) => {
                   </div>
                   <h3 className="text-xl font-bold mb-2">Máquina de Vendas Desligada</h3>
                   <p className="text-slate-500 mb-6 max-w-md">Gere scripts de ligação, emails frios e uma cadência completa personalizada para este lead.</p>
-                  <button 
-                    onClick={handleSalesMachine} 
-                    disabled={loading}
-                    className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg hover:shadow-xl transition-all flex items-center gap-2 disabled:opacity-50"
-                  >
-                    {loading ? <Icons.Refresh /> : '🚀 Gerar Estratégia (1 Crédito)'} 
-                  </button>
+                  <div className="flex gap-4">
+                    <button
+                        onClick={handleSalesMachine}
+                        disabled={loading}
+                        className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg hover:shadow-xl transition-all flex items-center gap-2 disabled:opacity-50"
+                    >
+                        {loading ? <Icons.Refresh /> : '🚀 Gerar Estratégia (1 Crédito)'}
+                    </button>
+                    {lead.salesKit && (
+                        <button
+                            onClick={handleAutopilot}
+                            disabled={loading}
+                            className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg hover:shadow-xl transition-all flex items-center gap-2 disabled:opacity-50"
+                        >
+                            <Icons.Zap /> Autopilot
+                        </button>
+                    )}
+                  </div>
                 </div>
               ) : !loading && lead.salesKit ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

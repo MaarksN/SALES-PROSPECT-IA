@@ -8,9 +8,10 @@ import {
   transcribeAudio,
   analyzeVisualContent
 } from '../services/geminiService';
+import { ragService } from '../services/ragService';
 
 const AILab: React.FC = () => {
-  const [activeTool, setActiveTool] = useState<'image' | 'video' | 'audio' | 'brain'>('image');
+  const [activeTool, setActiveTool] = useState<'image' | 'video' | 'audio' | 'brain' | 'rag'>('image');
   const [prompt, setPrompt] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
@@ -45,6 +46,14 @@ const AILab: React.FC = () => {
         // Deep Reasoning
         const res = await deepReasoning(prompt);
         setResult(res);
+      } else if (activeTool === 'rag') {
+          if (file) {
+              const docId = await ragService.uploadDocument(file);
+              setResult(`Documento processado com ID: ${docId}. Agora você pode fazer perguntas sobre ele.`);
+          } else {
+              const context = await ragService.getContextFromDocuments(prompt);
+              setResult(context);
+          }
       } else if (activeTool === 'audio') {
         if (file) {
             // Transcription
@@ -118,6 +127,12 @@ const AILab: React.FC = () => {
         >
             <Icons.Brain /> Deep Thinking
         </button>
+        <button
+            onClick={() => { setActiveTool('rag'); setResult(null); }}
+            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all ${activeTool === 'rag' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50'}`}
+        >
+            <Icons.Upload /> RAG (Knowledge)
+        </button>
       </div>
 
       {/* Controls Area */}
@@ -158,21 +173,39 @@ const AILab: React.FC = () => {
                 </div>
             )}
 
-            {activeTool === 'audio' && (
+            {(activeTool === 'audio' || activeTool === 'rag') && (
                 <div className="col-span-3">
                     <label className="block text-sm font-semibold mb-2 dark:text-slate-300">Modo</label>
-                    <div className="flex gap-4">
-                        <label className="flex items-center gap-2">
-                            <input type="radio" name="audioMode" checked={!file} onChange={() => setFile(null)} />
-                            Texto para Fala (TTS)
-                        </label>
-                        <label className="flex items-center gap-2">
-                            <input type="radio" name="audioMode" checked={!!file} onChange={() => {}} />
-                            Transcrição (Upload Arquivo)
-                        </label>
-                    </div>
-                    {/* Fake Trigger for Radio above to make file input logic simpler visually */}
-                    <input type="file" accept="audio/*" onChange={handleFileUpload} className="mt-4 block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"/>
+                    {activeTool === 'audio' ? (
+                        <div className="flex gap-4">
+                            <label className="flex items-center gap-2">
+                                <input type="radio" name="audioMode" checked={!file} onChange={() => setFile(null)} />
+                                Texto para Fala (TTS)
+                            </label>
+                            <label className="flex items-center gap-2">
+                                <input type="radio" name="audioMode" checked={!!file} onChange={() => {}} />
+                                Transcrição (Upload Arquivo)
+                            </label>
+                        </div>
+                    ) : (
+                        <div className="flex gap-4">
+                            <label className="flex items-center gap-2">
+                                <input type="radio" name="ragMode" checked={!file} onChange={() => setFile(null)} />
+                                Pergunta (Chat com Dados)
+                            </label>
+                            <label className="flex items-center gap-2">
+                                <input type="radio" name="ragMode" checked={!!file} onChange={() => {}} />
+                                Upload de PDF (Treinamento)
+                            </label>
+                        </div>
+                    )}
+
+                    <input
+                        type="file"
+                        accept={activeTool === 'audio' ? "audio/*" : ".pdf,.txt,.docx"}
+                        onChange={handleFileUpload}
+                        className="mt-4 block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                    />
                 </div>
             )}
         </div>
@@ -180,7 +213,7 @@ const AILab: React.FC = () => {
         {/* Input */}
         <div className="mb-6">
             <label className="block text-sm font-semibold mb-2 dark:text-slate-300">
-                {activeTool === 'brain' ? 'O que você quer pesquisar ou raciocinar?' : 'Prompt Criativo'}
+                {activeTool === 'brain' ? 'O que você quer pesquisar ou raciocinar?' : activeTool === 'rag' ? 'Faça uma pergunta sobre seus documentos' : 'Prompt Criativo'}
             </label>
             <textarea 
                 value={prompt}

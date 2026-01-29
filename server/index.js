@@ -113,6 +113,13 @@ app.post('/api/generate', authenticateUser, async (req, res) => {
     }
 });
 
+// STUB: RAG Context Upload
+app.post('/api/upload-context', authenticateUser, async (req, res) => {
+    // In production, use multer for file handling
+    console.log("[BFF] Received context document upload request");
+    res.json({ success: true, documentId: `doc_${Date.now()}` });
+});
+
 // STUB: Image Generation Endpoint (Imagen)
 app.post('/api/generate-image', authenticateUser, async (req, res) => {
     try {
