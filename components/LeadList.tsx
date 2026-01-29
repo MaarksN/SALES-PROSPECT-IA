@@ -1,5 +1,9 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+// @ts-ignore
+import { FixedSizeList as List } from 'react-window';
+// @ts-ignore
+import AutoSizer from 'react-virtualized-auto-sizer';
 import { Lead } from '../types';
 import { Icons } from '../constants';
 import { searchNewLeads } from '../services/geminiService';
@@ -7,6 +11,7 @@ import { crmService } from '../services/crmService';
 import { Skeleton } from './Skeleton';
 import { useStore } from '../store/useStore'; // Zustand
 import { toast } from 'react-hot-toast';
+import { LeadCard } from './LeadCard';
 
 interface LeadListProps {
   leads: Lead[];
@@ -414,90 +419,32 @@ const LeadList: React.FC<LeadListProps> = ({ leads, onSelect, onAddLeads }) => {
           </div>
       )}
 
-      {/* LIST VIEW */}
+      {/* LIST VIEW (Virtualized) */}
       {!isSearchingAI && !isLoading && viewMode === 'list' && (
-        <div className="grid grid-cols-1 gap-8">
-            {filteredLeads.map((lead) => (
-            <div 
-                key={lead.id} 
-                className={`group relative bg-white dark:bg-[#0F1629] p-10 rounded-[3rem] border transition-all duration-300 hover:scale-[1.01] ${
-                    lead.score > 80 
-                    ? 'border-amber-400/50 dark:border-amber-500/50 shadow-[0_20px_60px_-15px_rgba(245,158,11,0.15)]' 
-                    : 'border-slate-100 dark:border-white/5 shadow-xl hover:shadow-2xl'
-                }`}
-            >
-                {/* High Score Badge */}
-                {lead.score > 80 && (
-                    <div className="absolute -top-5 right-12 bg-gradient-to-r from-amber-400 to-orange-500 text-white text-xs font-black uppercase tracking-widest px-6 py-3 rounded-full shadow-lg flex items-center gap-2 z-10 ring-4 ring-white dark:ring-[#05050A]">
-                        <Icons.Sparkles /> Oportunidade Ouro
-                    </div>
+        <div className="h-[800px] w-full">
+            {/* @ts-ignore */}
+            <AutoSizer>
+                {({ height, width }: { height: number; width: number }) => (
+                    <List
+                        height={height}
+                        width={width}
+                        itemCount={filteredLeads.length}
+                        itemSize={250}
+                    >
+                        {({ index, style }: { index: number; style: React.CSSProperties }) => (
+                            <LeadCard
+                                lead={filteredLeads[index]}
+                                style={style}
+                                onSelect={onSelect}
+                                onWhatsApp={handleWhatsApp}
+                                onCRMExport={handleCRMExport}
+                                openGoogleMaps={openGoogleMaps}
+                                stringToColor={stringToColor}
+                            />
+                        )}
+                    </List>
                 )}
-
-                <div className="flex flex-col md:flex-row justify-between gap-10">
-                    {/* Left: Avatar & Info */}
-                    <div className="flex gap-8 items-start flex-1">
-                        <div 
-                            className="w-24 h-24 rounded-[2rem] flex items-center justify-center text-4xl font-black text-white shadow-2xl"
-                            style={{ backgroundColor: stringToColor(lead.companyName) }}
-                        >
-                            {lead.companyName.charAt(0)}
-                        </div>
-                        
-                        <div className="space-y-3">
-                            <h3 className="text-3xl font-bold dark:text-white group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-purple-500 group-hover:to-pink-500 transition-all">
-                                {lead.companyName}
-                            </h3>
-                            <div className="flex flex-wrap gap-3 text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-                                <span className="flex items-center gap-2 bg-slate-100 dark:bg-white/5 px-4 py-2 rounded-xl border border-slate-200 dark:border-white/5">🏢 {lead.sector}</span>
-                                <span className="flex items-center gap-2 bg-slate-100 dark:bg-white/5 px-4 py-2 rounded-xl border border-slate-200 dark:border-white/5">📍 {lead.location}</span>
-                            </div>
-                            
-                            {(lead as any).matchReason && (
-                                <div className="mt-4 p-5 bg-indigo-50 dark:bg-indigo-500/10 rounded-3xl border border-indigo-100 dark:border-indigo-500/20 max-w-2xl relative">
-                                    <div className="absolute -left-2 top-6 w-0 h-0 border-t-[10px] border-t-transparent border-r-[10px] border-r-indigo-50 dark:border-r-indigo-500/10 border-b-[10px] border-b-transparent"></div>
-                                    <p className="text-base text-indigo-800 dark:text-indigo-300 italic flex gap-3 items-start leading-relaxed">
-                                        <span className="text-2xl">💡</span> "{(lead as any).matchReason}"
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Right: Actions & Score */}
-                    <div className="flex flex-col items-end gap-6 min-w-[200px]">
-                        <div className="text-right p-4 bg-slate-50 dark:bg-white/5 rounded-3xl border border-slate-100 dark:border-white/5 w-full">
-                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">Score IA</p>
-                            <div className="text-5xl font-black bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                                {lead.score}<span className="text-lg text-slate-300 dark:text-slate-600">/100</span>
-                            </div>
-                        </div>
-
-                        <div className="flex gap-4 w-full">
-                            <button 
-                                onClick={() => handleWhatsApp(lead)}
-                                className="w-16 h-16 flex items-center justify-center rounded-[1.5rem] bg-green-50 dark:bg-green-900/20 text-green-600 hover:bg-green-100 hover:scale-105 transition-all"
-                                title="WhatsApp Web"
-                            >
-                                <Icons.Phone />
-                            </button>
-                            <button
-                                onClick={() => handleCRMExport(lead)}
-                                className="w-16 h-16 flex items-center justify-center rounded-[1.5rem] bg-orange-50 dark:bg-orange-900/20 text-orange-600 hover:bg-orange-100 hover:scale-105 transition-all"
-                                title="Exportar para CRM"
-                            >
-                                <Icons.Upload />
-                            </button>
-                            <button 
-                                onClick={() => onSelect(lead)}
-                                className="flex-1 px-8 py-4 rounded-[1.5rem] font-bold text-white bg-[#0B1120] dark:bg-white dark:text-[#0B1120] hover:bg-purple-600 dark:hover:bg-purple-500 dark:hover:text-white transition-all shadow-xl hover:shadow-purple-500/25 flex items-center justify-center gap-3 group/btn"
-                            >
-                                Detalhes <span className="text-xl group-hover/btn:translate-x-1 transition-transform">➔</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            ))}
+            </AutoSizer>
         </div>
       )}
 
