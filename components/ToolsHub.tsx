@@ -13,16 +13,34 @@ interface VoiceInputProps {
   onTranscript: (text: string) => void;
 }
 
+// Define minimal SpeechRecognition type for browser compatibility
+interface SpeechRecognitionEvent {
+    results: {
+        [key: number]: {
+            [key: number]: {
+                transcript: string;
+            };
+        };
+    };
+}
+
+interface SpeechRecognitionErrorEvent {
+    error: string;
+    message?: string;
+}
+
 const VoiceInput: React.FC<VoiceInputProps> = ({ onTranscript }) => {
   const [isListening, setIsListening] = useState(false);
 
   const startListening = () => {
-    if (!('webkitSpeechRecognition' in window)) {
+    // Type assertion for non-standard Web Speech API
+    const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+
+    if (!SpeechRecognition) {
       toast.error('Navegador não suporta reconhecimento de voz.');
       return;
     }
 
-    const SpeechRecognition = (window as any).webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
     recognition.lang = 'pt-BR';
     recognition.continuous = false;
@@ -30,12 +48,13 @@ const VoiceInput: React.FC<VoiceInputProps> = ({ onTranscript }) => {
 
     recognition.onstart = () => setIsListening(true);
     recognition.onend = () => setIsListening(false);
-    recognition.onerror = (event: any) => {
+
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
         console.error(event.error);
         setIsListening(false);
     };
 
-    recognition.onresult = (event: any) => {
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
       const transcript = event.results[0][0].transcript;
       onTranscript(transcript);
     };
@@ -49,6 +68,7 @@ const VoiceInput: React.FC<VoiceInputProps> = ({ onTranscript }) => {
       onClick={startListening}
       className={`absolute right-3 bottom-3 p-2 rounded-full transition-colors ${isListening ? 'bg-red-500 text-white animate-pulse' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 hover:text-indigo-500'}`}
       title="Falar para digitar"
+      aria-label="Ativar reconhecimento de voz"
     >
       <Icons.Mic />
     </button>
@@ -118,9 +138,14 @@ const ToolsHub: React.FC = () => {
         const output = await executeSalesTool(activeTool, formValues, userContext || undefined);
         setResult(output);
         toast.success('Gerado com sucesso! (1 Crédito usado)');
-    } catch (error: any) {
-        if (error.message !== "LOW_CREDITS") {
-            toast.error(error.message);
+    } catch (error) {
+        // Safe error handling without 'any'
+        if (error instanceof Error) {
+             if (error.message !== "LOW_CREDITS") {
+                toast.error(error.message);
+            }
+        } else {
+            toast.error("Ocorreu um erro desconhecido.");
         }
     } finally {
       setLoading(false);
@@ -202,7 +227,7 @@ const ToolsHub: React.FC = () => {
               <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-lg shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
                   <div className="p-6 bg-gradient-to-r from-indigo-600 to-purple-600 text-white flex justify-between items-center">
                       <h3 className="font-bold text-xl flex items-center gap-2"><Icons.Brain /> Ensinar a IA</h3>
-                      <button onClick={() => setShowContextModal(false)} className="hover:bg-white/20 p-2 rounded-full"><Icons.X /></button>
+                      <button onClick={() => setShowContextModal(false)} className="hover:bg-white/20 p-2 rounded-full" aria-label="Fechar Modal"><Icons.X /></button>
                   </div>
                   <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
                       <p className="text-sm text-slate-500 dark:text-slate-400">
