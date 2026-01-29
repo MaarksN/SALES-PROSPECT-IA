@@ -1,22 +1,13 @@
 
-import { GoogleGenAI, Type, Modality, GenerateContentResponse, Schema } from "@google/genai";
+import { Type, GenerateContentResponse, Schema } from "@google/genai";
 import { Lead, SalesKit, Competitor, DecisionMaker, AIToolConfig, UserContext, BirthubDossier, BirthubAnalysisResult, GroundingSource } from '../types';
 
 /**
- * SECURITY WARNING:
- * The API_KEY is currently read from process.env on the client-side.
- * In a production environment, this exposes your API key to users.
- *
- * RECOMMENDED FIX:
- * Implement a Backend-for-Frontend (BFF) pattern:
- * 1. Create a server (Node.js/Express, Next.js API Routes, etc.).
- * 2. Move these API calls to the server.
- * 3. The frontend should call your server endpoints (e.g., /api/generate).
- * 4. Store the API_KEY only in the server environment variables.
+ * SECURITY UPDATE:
+ * BFF (Backend-for-Frontend) Pattern Implemented.
+ * API Key is now secure on the server.
+ * Frontend calls /api/generate which proxies to Google GenAI.
  */
-
-// Initialize Gemini Client
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // Using stable model version
 const modelName = 'gemini-1.5-flash';
@@ -34,6 +25,52 @@ interface GenerateConfig {
     systemInstruction?: string;
     [key: string]: any;
 }
+
+/**
+ * Helper to call the BFF endpoint.
+ * Replaces direct GoogleGenAI SDK usage on the client.
+ */
+const callGeminiAPI = async (model: string, contents: any, config?: GenerateConfig): Promise<any> => {
+    try {
+        const response = await fetch('/api/generate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                model,
+                contents,
+                config
+            })
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`API Error (${response.status}): ${errorText}`);
+        }
+
+        const data = await response.json();
+
+        // Compatibility shim: Add .text property if missing, extracting from candidates
+        if (data && !('text' in data)) {
+            let textVal = null;
+            if (data.candidates && data.candidates.length > 0) {
+                const candidate = data.candidates[0];
+                if (candidate.content && candidate.content.parts) {
+                    textVal = candidate.content.parts.map((p: any) => p.text || '').join('');
+                }
+            }
+            // Return a new object with the text property
+            return { ...data, text: textVal };
+        }
+
+        return data;
+    } catch (error) {
+        console.error("BFF Call Failed:", error);
+        throw error;
+    }
+};
+
 
 /**
  * Helper to convert simplified schema to Gemini API Schema
@@ -116,10 +153,7 @@ export const executeAITool = async (
       IMPORTANTE: Adapte a resposta para refletir este contexto e tom de voz.`;
     }
 
-    // 3. Instancia novo cliente
-    const freshAi = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
-    // 4. Configuração da Chamada
+    // 3. Configuração da Chamada
     const generateConfig: GenerateConfig = {
       temperature: 0.7,
     };
@@ -130,17 +164,15 @@ export const executeAITool = async (
       generateConfig.responseSchema = convertToGeminiSchema(simpleSchema);
     }
 
-    // 5. Chamada à API
-    const response = await freshAi.models.generateContent({
-      model: modelName,
-      contents: [
+    // 4. Chamada à API via BFF
+    const contents = [
         { 
             role: 'user', 
             parts: [{ text: `SYSTEM ROLE: ${enrichedSystemRole}\n\n--- TAREFA ---\n${finalPrompt}` }] 
         }
-      ],
-      config: generateConfig
-    });
+    ];
+
+    const response = await callGeminiAPI(modelName, contents, generateConfig);
 
     let textResponse = response.text || "Sem resposta gerada.";
 
@@ -168,8 +200,6 @@ export const executeAITool = async (
  */
 export const executeBirthubEngine = async (target: string): Promise<BirthubAnalysisResult | null> => {
   try {
-    const freshAi = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    
     const systemPrompt = `Você é o Birthub AI v2.1, o Agente de Prospecção Comercial B2B autônomo.
 
     MISSÃO:
@@ -196,10 +226,11 @@ export const executeBirthubEngine = async (target: string): Promise<BirthubAnaly
     SAÍDA:
     Gere um dossiê JSON estritamente tipado contendo análise profunda, score detalhado e estratégia de ativação.`;
 
-    const response: GenerateContentResponse = await freshAi.models.generateContent({
-      model: modelName,
-      contents: `TARGET PARA ANÁLISE PROFUNDA: ${target}`,
-      config: {
+    const contents = `TARGET PARA ANÁLISE PROFUNDA: ${target}`; // Can be string or object, callGeminiAPI handles basic contents
+    // Ideally convert to object for consistency
+    const contentsObj = { role: 'user', parts: [{ text: contents }] };
+
+    const config: GenerateConfig = {
         systemInstruction: systemPrompt,
         tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
@@ -293,8 +324,9 @@ export const executeBirthubEngine = async (target: string): Promise<BirthubAnaly
             }
           }
         }
-      }
-    });
+    };
+
+    const response = await callGeminiAPI(modelName, [contentsObj], config);
 
     if (response.text) {
       const dossier = JSON.parse(response.text) as BirthubDossier;
@@ -328,26 +360,21 @@ export const sendChatMessage = async (
   userContext?: UserContext
 ) => {
   try {
-    const freshAi = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    
     let systemInstruction = "Você é um assistente de vendas de elite. Ajude o usuário a vender mais, superar objeções e criar estratégias.";
     if (userContext) {
       systemInstruction += `\n\nContexto: Você trabalha para a empresa ${userContext.myCompany}, vendendo ${userContext.myProduct}. Use um tom ${userContext.toneOfVoice}.`;
     }
 
-    const chat = freshAi.chats.create({
-      model: modelName,
-      config: {
-        systemInstruction: systemInstruction,
-      },
-      history: history.map(h => ({
+    // Construct full history for stateless call
+    const contents = history.map(h => ({
         role: h.role,
         parts: [{ text: h.text }]
-      }))
-    });
+    }));
+    // Add new message
+    contents.push({ role: 'user', parts: [{ text: newMessage }] });
 
-    const result = await chat.sendMessage({ message: newMessage });
-    return result.text;
+    const response = await callGeminiAPI(modelName, contents, { systemInstruction });
+    return response.text;
   } catch (error) {
     console.error("Chat Error:", error);
     throw error;
@@ -382,10 +409,9 @@ export const searchNewLeads = async (
     
     Use a ferramenta de busca para garantir dados reais.`;
 
-    const response = await ai.models.generateContent({
-      model: modelName,
-      contents: prompt,
-      config: {
+    const contents = [{ role: 'user', parts: [{ text: prompt }] }];
+
+    const response = await callGeminiAPI(modelName, contents, {
         tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
         responseSchema: {
@@ -407,7 +433,6 @@ export const searchNewLeads = async (
             required: ["companyName", "location", "score", "matchReason"]
           }
         }
-      }
     });
 
     if (response.text) {
@@ -428,10 +453,9 @@ export const enrichDecisionMakers = async (companyName: string): Promise<Decisio
     const prompt = `Identifique cargos prováveis de tomadores de decisão na empresa ${companyName}. 
     Foque em Diretores, Gerentes e C-Level. Retorne 3 personas.`;
 
-    const response = await ai.models.generateContent({
-      model: modelName,
-      contents: prompt,
-      config: {
+    const contents = [{ role: 'user', parts: [{ text: prompt }] }];
+
+    const response = await callGeminiAPI(modelName, contents, {
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
@@ -444,7 +468,6 @@ export const enrichDecisionMakers = async (companyName: string): Promise<Decisio
             }
           }
         }
-      }
     });
 
     if (response.text) {
@@ -473,10 +496,9 @@ export const generateSalesKit = async (companyName: string, sector: string): Pro
     5. Cadência de Prospecção de 3 passos (Dia 1, Dia 3, Dia 7) misturando canais.
     6. Duas objeções comuns e como contornar.`;
 
-    const response = await ai.models.generateContent({
-      model: modelName,
-      contents: prompt,
-      config: {
+    const contents = [{ role: 'user', parts: [{ text: prompt }] }];
+
+    const response = await callGeminiAPI(modelName, contents, {
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -509,7 +531,6 @@ export const generateSalesKit = async (companyName: string, sector: string): Pro
             }
           }
         }
-      }
     });
 
     if (response.text) {
@@ -526,10 +547,9 @@ export const analyzeCompetitors = async (companyName: string): Promise<Competito
   try {
     const prompt = `Liste 3 concorrentes diretos ou indiretos para ${companyName} no mercado brasileiro e seu ponto forte principal.`;
 
-    const response = await ai.models.generateContent({
-      model: modelName,
-      contents: prompt,
-      config: {
+    const contents = [{ role: 'user', parts: [{ text: prompt }] }];
+
+    const response = await callGeminiAPI(modelName, contents, {
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
@@ -541,7 +561,6 @@ export const analyzeCompetitors = async (companyName: string): Promise<Competito
             }
           }
         }
-      }
     });
 
     if (response.text) {
@@ -556,12 +575,9 @@ export const analyzeCompetitors = async (companyName: string): Promise<Competito
 
 export const checkLocationData = async (companyName: string, city: string) => {
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
-      contents: `Find the exact address, rating and recent reviews for ${companyName} in ${city}.`,
-      config: {
+    const contents = [{ role: 'user', parts: [{ text: `Find the exact address, rating and recent reviews for ${companyName} in ${city}.` }] }];
+    const response = await callGeminiAPI("gemini-1.5-flash", contents, {
         tools: [{ googleMaps: {} }],
-      },
     });
     return response.text;
   } catch (error) {
@@ -587,11 +603,8 @@ export const generateSpeech = async (text: string) => {
 
 export const deepReasoning = async (query: string) => {
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-1.5-pro",
-      contents: query,
-      // Removed thinkingConfig as it's not standard in 1.5 stable
-    });
+    const contents = [{ role: 'user', parts: [{ text: query }] }];
+    const response = await callGeminiAPI("gemini-1.5-pro", contents);
     return response.text;
   } catch (error) {
     console.error("Thinking Error:", error);
@@ -601,15 +614,14 @@ export const deepReasoning = async (query: string) => {
 
 export const transcribeAudio = async (base64Audio: string, mimeType: string) => {
   try {
-    const response = await ai.models.generateContent({
-      model: modelName,
-      contents: {
+    const contents = {
         parts: [
           { inlineData: { mimeType, data: base64Audio } },
           { text: "Transcribe this audio precisely." }
         ]
-      }
-    });
+      };
+
+    const response = await callGeminiAPI(modelName, contents);
     return response.text;
   } catch (error) {
     console.error("Transcription Error:", error);
@@ -619,15 +631,13 @@ export const transcribeAudio = async (base64Audio: string, mimeType: string) => 
 
 export const analyzeVisualContent = async (base64Data: string, mimeType: string, prompt: string) => {
     try {
-        const response = await ai.models.generateContent({
-            model: 'gemini-1.5-pro',
-            contents: {
+        const contents = {
                 parts: [
                     { inlineData: { mimeType, data: base64Data } },
                     { text: prompt }
                 ]
-            }
-        });
+            };
+        const response = await callGeminiAPI('gemini-1.5-pro', contents);
         return response.text;
     } catch (error) {
         console.error("Visual Analysis Error:", error);
