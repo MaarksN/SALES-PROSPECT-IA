@@ -576,8 +576,32 @@ export const generateMarketingImage = async (prompt: string, size: "1K" | "2K" |
 };
 
 export const generateVideoAsset = async (prompt: string, aspectRatio: '16:9' | '9:16' = '16:9') => {
-  console.warn("Video Generation disabled: Requires Veo model which is currently in restricted preview.");
-  return null;
+  try {
+    const freshAi = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+    let operation = await freshAi.models.generateVideos({
+      model: 'veo-3.1-fast-generate-preview',
+      prompt: prompt,
+      config: {
+        aspectRatio: aspectRatio
+      }
+    });
+
+    const pollIntervals = [1000, 2000, 4000, 5000];
+    let attempt = 0;
+
+    while (!operation.done) {
+      const interval = pollIntervals[Math.min(attempt, pollIntervals.length - 1)];
+      await new Promise(resolve => setTimeout(resolve, interval));
+      operation = await freshAi.operations.getVideosOperation({ operation: operation });
+      attempt++;
+    }
+
+    return operation.response;
+  } catch (error) {
+    console.error("Video Generation Error:", error);
+    return null;
+  }
 };
 
 export const generateSpeech = async (text: string) => {
