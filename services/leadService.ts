@@ -10,9 +10,6 @@ import { Lead } from '../types';
 
 const LOCAL_STORAGE_KEY = 'sales_prospector_leads';
 
-// Simula delay de rede para UX realista
-const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
-
 export const leadService = {
     
     async fetchLeads(): Promise<Lead[]> {
@@ -26,7 +23,6 @@ export const leadService = {
             return data as any; // Mapping types would go here
         } else {
             // Fallback Local
-            await delay(500);
             const data = localStorage.getItem(LOCAL_STORAGE_KEY);
             return data ? JSON.parse(data) : [];
         }
@@ -44,7 +40,6 @@ export const leadService = {
             if (error) throw error;
             return data;
         } else {
-            await delay(300);
             const leads = await this.fetchLeads();
             const newLeads = [lead, ...leads];
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newLeads));
@@ -64,7 +59,6 @@ export const leadService = {
             if (error) throw error;
             return data;
         } else {
-            await delay(200);
             const leads = await this.fetchLeads();
             const index = leads.findIndex(l => l.id === lead.id);
             if (index !== -1) {
@@ -84,7 +78,6 @@ export const leadService = {
             
             if (error) throw error;
         } else {
-            await delay(200);
             const leads = await this.fetchLeads();
             const filtered = leads.filter(l => l.id !== id);
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(filtered));
