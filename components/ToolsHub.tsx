@@ -1,5 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
+import { useMutation } from '@tanstack/react-query';
+import { z } from 'zod';
 import { Icons } from '../constants';
 import { TOOLS_REGISTRY } from '../constants/tools';
 import { AIToolConfig, ToolInput, UserContext, SavedGen } from '../types';
@@ -7,13 +9,13 @@ import { executeSalesTool } from '../services/geminiService';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { toast } from 'react-hot-toast';
 import { useStore } from '../store/useStore';
+import { exportToPDF } from '../lib/pdfExport';
 
 // --- TYPES LOCAL ---
 interface VoiceInputProps {
   onTranscript: (text: string) => void;
 }
 
-// Define minimal SpeechRecognition type for browser compatibility
 interface SpeechRecognitionEvent {
     results: {
         [key: number]: {
@@ -33,7 +35,6 @@ const VoiceInput: React.FC<VoiceInputProps> = ({ onTranscript }) => {
   const [isListening, setIsListening] = useState(false);
 
   const startListening = () => {
-    // Type assertion for non-standard Web Speech API
     const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
 
     if (!SpeechRecognition) {
@@ -91,7 +92,6 @@ const ToolsHub: React.FC = () => {
   
   // UI States
   const [formValues, setFormValues] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [showContextModal, setShowContextModal] = useState(false);
 
@@ -104,7 +104,32 @@ const ToolsHub: React.FC = () => {
       if (userContext) setTempContext(userContext);
   }, [userContext]);
 
-  // Filtragem inteligente
+  // React Query & Validation
+  const mutation = useMutation({
+    mutationFn: async (vars: { tool: AIToolConfig; values: Record<string, string>; context?: UserContext | null }) => {
+        return executeSalesTool(vars.tool, vars.values, vars.context || undefined, (text) => {
+            setResult(text);
+        });
+    },
+    onSuccess: (data) => {
+        setResult(data);
+        toast.success('Gerado com sucesso! (1 Crédito usado)');
+        if (navigator.vibrate) navigator.vibrate(200);
+        decrementCredits(1);
+    },
+    onError: (error: Error) => {
+        toast.error(error.message);
+    }
+  });
+
+  const generateSchema = (inputs: ToolInput[]) => {
+      const shape: any = {};
+      inputs.forEach(input => {
+        shape[input.name] = z.string().min(1, `Campo ${input.label} é obrigatório`);
+      });
+      return z.object(shape);
+  };
+
   const filteredTools = useMemo(() => {
     return TOOLS_REGISTRY.filter(tool => {
       const matchesSearch = tool.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -119,37 +144,22 @@ const ToolsHub: React.FC = () => {
     setResult(null);
     setFormValues({});
     setViewMode('tools');
+    mutation.reset();
   };
 
-  const handleExecute = async () => {
+  const handleExecute = () => {
     if (!activeTool) return;
     
-    try {
-        decrementCredits(1); // Consome 1 crédito
-        setLoading(true);
-        setResult(null);
+    const schema = generateSchema(activeTool.inputs);
+    const validation = schema.safeParse(formValues);
 
-        const missingFields = activeTool.inputs.filter(input => !formValues[input.name]);
-        if (missingFields.length > 0) {
-            throw new Error(`Por favor, preencha o campo: ${missingFields[0].label}`);
-        }
-
-        // Execute with User Context Injection
-        const output = await executeSalesTool(activeTool, formValues, userContext || undefined);
-        setResult(output);
-        toast.success('Gerado com sucesso! (1 Crédito usado)');
-    } catch (error) {
-        // Safe error handling without 'any'
-        if (error instanceof Error) {
-             if (error.message !== "LOW_CREDITS") {
-                toast.error(error.message);
-            }
-        } else {
-            toast.error("Ocorreu um erro desconhecido.");
-        }
-    } finally {
-      setLoading(false);
+    if (!validation.success) {
+        toast.error(validation.error.errors[0].message);
+        return;
     }
+
+    setResult(null);
+    mutation.mutate({ tool: activeTool, values: formValues, context: userContext });
   };
 
   const handleSaveResult = () => {
@@ -396,11 +406,11 @@ const ToolsHub: React.FC = () => {
 
                         <button 
                             onClick={handleExecute}
-                            disabled={loading}
+                            disabled={mutation.isPending}
                             className="w-full py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold rounded-xl shadow-lg hover:shadow-indigo-500/25 hover:scale-[1.01] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-3"
                         >
-                            {loading ? <Icons.Refresh className="animate-spin" /> : <Icons.Zap />}
-                            {loading ? 'Processando Inteligência...' : 'Executar (1 Crédito)'}
+                            {mutation.isPending ? <Icons.Refresh className="animate-spin" /> : <Icons.Zap />}
+                            {mutation.isPending ? 'Processando Inteligência...' : 'Executar (1 Crédito)'}
                         </button>
 
                         {result && (
@@ -415,6 +425,12 @@ const ToolsHub: React.FC = () => {
                                             className="text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
                                         >
                                             <Icons.Plus /> SALVAR
+                                        </button>
+                                        <button
+                                            onClick={() => exportToPDF(activeTool.name, result)}
+                                            className="text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+                                        >
+                                            <Icons.Download className="w-3 h-3" /> PDF
                                         </button>
                                         <button 
                                             onClick={() => {navigator.clipboard.writeText(result); toast.success('Copiado!')}}
