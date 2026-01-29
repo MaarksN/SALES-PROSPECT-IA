@@ -1,8 +1,8 @@
-# Relatório Técnico: Sales Prospector AI Intelligence
+# Relatório Técnico: Sales Prospector AI Intelligence (Atualizado)
 
-**Data da Análise:** 23/02/2025
+**Data da Análise:** 23/02/2025 (Revisão v2)
 **Analista:** Jules (Agente de Engenharia de Software)
-**Escopo:** Análise completa do código fonte, arquitetura e stack tecnológica.
+**Escopo:** Análise completa do código fonte, arquitetura e stack tecnológica pós-refatoração.
 
 ---
 
@@ -10,97 +10,69 @@
 
 O **Sales Prospector AI Intelligence** é uma Aplicação de Página Única (SPA) de alto desempenho focada em inteligência comercial B2B. A ferramenta atua como um "Sistema Operacional de Vendas", integrando prospecção de leads, enriquecimento de dados e geração de conteúdo de vendas através de Inteligência Artificial generativa (Google Gemini).
 
-O diferencial técnico do projeto reside na sua **arquitetura híbrida** (funciona com ou sem backend conectado) e na utilização avançada de **Engenharia de Prompt Estruturada** (JSON Schema), garantindo que a IA retorne dados utilizáveis programaticamente, e não apenas texto livre.
+O diferencial técnico do projeto reside na sua **arquitetura híbrida** (funciona com ou sem backend conectado), utilização de **Engenharia de Prompt Estruturada** (JSON Schema), e agora, uma infraestrutura robusta de **Testes e Internacionalização**.
 
 ---
 
-## 2. Stack Tecnológica
+## 2. Stack Tecnológica (Atualizada)
 
 ### Frontend & Core
 *   **Framework:** React 18
 *   **Build Tool:** Vite (garantindo performance de desenvolvimento e build rápido).
-*   **Linguagem:** TypeScript (tipagem estática forte utilizada em interfaces como `Lead`, `BirthubDossier`, `AIToolConfig`).
+*   **Linguagem:** TypeScript (tipagem estática forte, com uso reduzido de `any` após refatoração).
+*   **Roteamento:** `react-router-dom` v6 (Implementado na refatoração para substituir troca manual de views).
 *   **Estilização:** Tailwind CSS (com suporte a Dark Mode nativo e animações via `tailwindcss-animate`).
-*   **Gerenciamento de Estado:** Zustand (`store/useStore.ts`). Escolha leve e eficiente, evitando a complexidade de Redux para este escopo.
+*   **Gerenciamento de Estado:** Zustand (`store/useStore.ts`).
 
 ### Backend & Persistência
 *   **BaaS (Backend as a Service):** Supabase (PostgreSQL + Auth).
-*   **Abstração de Serviços:** O projeto implementa um padrão de "Service Layer" (`services/leadService.ts`) que alterna automaticamente entre **Supabase** (se configurado) e **LocalStorage** (modo demo/offline). Isso demonstra uma excelente arquitetura para MVPs e demos robustas.
+*   **Abstração de Serviços:** Service Layer Pattern (`services/leadService.ts`) com fallback automático para LocalStorage.
 
-### Inteligência Artificial (O Motor)
+### Inteligência Artificial (Estabilizada)
 *   **Provedor:** Google GenAI SDK (`@google/genai`).
-*   **Modelos Utilizados:**
-    *   `gemini-3-flash-preview` (Raciocínio rápido e estruturado).
-    *   `gemini-3-pro-image-preview` (Geração de imagens de marketing).
-    *   `gemini-2.5-flash-preview-tts` (Text-to-Speech para scripts).
-    *   `veo-3.1-fast-generate-preview` (Geração de vídeos).
+*   **Modelos Utilizados:** `gemini-1.5-flash` e `gemini-1.5-pro` (Versões estáveis).
+    *   *Nota:* Funcionalidades experimentais (Imagem/Vídeo) foram desativadas temporariamente para garantir estabilidade em produção.
+
+### Qualidade & Infraestrutura
+*   **Testes:** Vitest + React Testing Library (Ambiente configurado com JSDOM).
+*   **Internacionalização:** i18next + react-i18next (Infraestrutura pronta para PT/EN).
 
 ---
 
 ## 3. Arquitetura de Software
 
-### 3.1. Gerenciamento de Estado (Zustand)
-O arquivo `store/useStore.ts` atua como o cérebro central da aplicação.
-*   **Centralização:** Gerencia Sessão de Usuário, Lista de Leads, Créditos (SaaS Economy) e Navegação.
-*   **Lógica de Negócio:** Contém regras de negócio como verificação de créditos antes de executar ações (`decrementCredits`).
+### 3.1. Roteamento (Novo)
+A aplicação agora utiliza **React Router Dom**.
+*   **`App.tsx`:** Define as rotas (`/`, `/leads`, `/tools`, etc.) usando `<Routes>`.
+*   **Navegação:** Hooks `useNavigate` e `useLocation` controlam o fluxo e destacam a sidebar.
+*   **Benefício:** Permite deep-linking (compartilhar URL de uma ferramenta específica) e uso do botão "Voltar" do navegador.
 
-### 3.2. Service Layer Pattern
-A aplicação desacopla a UI da lógica de dados e IA.
-*   **`services/geminiService.ts`**: Encapsula toda a complexidade da IA. Os componentes UI apenas chamam funções como `executeBirthubEngine` e recebem JSON pronto.
-*   **`services/leadService.ts`**: Abstrai a fonte de dados (DB vs Local), permitindo que o frontend seja agnóstico quanto ao backend.
-
-### 3.3. Roteamento
-Curiosamente, a aplicação **não utiliza React Router**. O roteamento é gerenciado manualmente via estado global (`activeView` no Zustand) dentro de `App.tsx`.
-*   **Prós:** Simplicidade para uma SPA focada em dashboard; transições de estado fluidas.
-*   **Contras:** Perde-se o "deep linking" (não é possível compartilhar uma URL direta para uma ferramenta específica) e o histórico do navegador (botão voltar) não funciona nativamente.
+### 3.2. Gerenciamento de Estado (Zustand)
+O `store/useStore.ts` continua centralizando a lógica de negócios (créditos, sessão), mas delegou a responsabilidade de "View Ativa" para o Router.
 
 ---
 
-## 4. Análise Profunda da Integração de IA
-
-Esta é a parte mais sofisticada do código. O projeto não usa a IA apenas como um chatbot, mas como um motor de processamento de dados.
+## 4. Integração de IA e Engenharia de Prompt
 
 ### 4.1. Saída Estruturada (JSON Schema)
-No arquivo `services/geminiService.ts`, funções como `executeBirthubEngine` utilizam a propriedade `responseSchema` da API do Gemini.
-*   **Impacto:** A IA é forçada a retornar um JSON estritamente tipado (`BirthubDossier`). Isso elimina a necessidade de *regex* ou *parsers* frágeis no frontend. O código trata a resposta da IA como se fosse uma API REST tradicional.
+O uso de `responseSchema` na API do Gemini garante retornos tipados (`BirthubDossier`), eliminando parsers frágeis.
 
 ### 4.2. Injeção de Contexto (Context Injection)
-O componente `ToolsHub.tsx` permite que o usuário defina um "Cérebro" (Empresa, Cargo, Produto, Tom de Voz).
-*   **Implementação:** Estes dados são injetados dinamicamente no *System Prompt* de todas as ferramentas (`executeAITool`).
-*   **Resultado:** As respostas são hiper-personalizadas sem que o usuário precise repetir quem é a cada prompt.
-
-### 4.3. Multimodalidade
-O código demonstra uso de capacidades de ponta:
-*   **Visão:** Analisa imagens (`analyzeVisualContent`).
-*   **Fala:** Gera áudio de scripts de vendas (`generateSpeech`).
-*   **Vídeo:** Gera assets de vídeo para marketing (`generateVideoAsset` com VEO).
+O componente `ToolsHub.tsx` injeta dinamicamente o perfil do usuário (Empresa, Cargo, Tom de Voz) no System Prompt, personalizando as respostas.
 
 ---
 
-## 5. Análise de Funcionalidades Chave
+## 5. Análise de Segurança (Ponto Crítico)
 
-### 5.1. Birthub Engine (`components/BirthubEngine.tsx`)
-*   **Conceito:** Simula um time de analistas (Investigador, Enrichment, RevOps).
-*   **UX:** Utiliza "logs de terminal" falsos para dar feedback visual enquanto a IA processa, melhorando a percepção de valor e paciência do usuário durante latências longas de IA.
-*   **Scoring:** A IA calcula um score (0-100) baseado em critérios definidos no prompt, simulando um algoritmo de Machine Learning tradicional.
-
-### 5.2. Tools Hub (`components/ToolsHub.tsx`)
-*   **Arquitetura Dinâmica:** Renderiza formulários baseados em uma configuração (`TOOLS_REGISTRY`). Isso permite adicionar novas ferramentas de IA apenas criando uma nova entrada no arquivo de constantes, sem criar novos componentes React.
-*   **Voz:** Inclui reconhecimento de voz (`webkitSpeechRecognition`) nos inputs, facilitando o uso mobile.
+**API Key Exposure:**
+A `API_KEY` do Gemini ainda é lida de `process.env` no cliente. Embora o código agora contenha um aviso explícito de segurança (`SECURITY WARNING`), a arquitetura ainda é **Client-Side Only**.
+*   **Risco:** Exposição da cota de IA.
+*   **Solução Recomendada:** Implementação urgente de um BFF (Backend-for-Frontend) para proxy das requisições.
 
 ---
 
-## 6. Pontos de Atenção e Riscos
+## 6. Conclusão
 
-1.  **Dependência de Modelos Preview:** O código utiliza modelos `*-preview` (ex: `gemini-3-flash-preview`). Estes modelos são voláteis e podem ser descontinuados ou alterados, o que quebraria a aplicação em produção.
-    *   *Recomendação:* Migrar para versões estáveis (ex: `gemini-1.5-flash`) para produção.
-2.  **Segurança de Chaves:** A `API_KEY` do Gemini e as credenciais do Supabase são lidas de variáveis de ambiente. No frontend, isso expõe as chaves se não houver um proxy ou backend intermediário (Middleman).
-    *   *Risco:* Um usuário malicioso pode extrair a API Key do bundle JS e usar a quota do Gemini.
-3.  **Roteamento:** A falta de um router real limita a escalabilidade da navegação e SEO (se fosse público).
-4.  **Tipagem `any`:** Em alguns pontos do `geminiService.ts` e `ToolsHub.tsx`, o uso de `any` é observado para lidar com respostas dinâmicas. Isso reduz a segurança que o TypeScript oferece.
+A refatoração elevou o nível do **Sales Prospector AI Intelligence** de um protótipo avançado para uma aplicação com estrutura profissional. A adoção de rotas reais, testes unitários e infraestrutura de i18n prepara o terreno para escalabilidade. A estabilização dos modelos de IA garante confiabilidade, embora ao custo de perder funcionalidades "bleeding edge" (multimodais) temporariamente.
 
-## 7. Conclusão
-
-O **Sales Prospector AI Intelligence** é uma demonstração técnica impressionante de como construir "GenAI Native Apps". Ele foge do padrão comum de "chatbots" e entrega fluxos de trabalho complexos e estruturados. A arquitetura é sólida para escalabilidade, embora necessite de ajustes de segurança (backend proxy para chaves) e estabilidade (versões de modelos) para um lançamento comercial massivo.
-
-**Classificação Técnica:** 🚀 **Avançado / Inovador**
+**Classificação Técnica:** 🚀 **Profissional / Preparado para Escala**
