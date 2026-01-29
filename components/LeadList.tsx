@@ -3,8 +3,10 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Lead } from '../types';
 import { Icons } from '../constants';
 import { searchNewLeads } from '../services/geminiService';
+import { crmService } from '../services/crmService';
 import { Skeleton } from './Skeleton';
 import { useStore } from '../store/useStore'; // Zustand
+import { toast } from 'react-hot-toast';
 
 interface LeadListProps {
   leads: Lead[];
@@ -217,6 +219,28 @@ const LeadList: React.FC<LeadListProps> = ({ leads, onSelect, onAddLeads }) => {
     link.click();
     document.body.removeChild(link);
   }
+
+  const handleWhatsApp = (lead: Lead) => {
+      if (!lead.phone) {
+          toast.error("Lead sem telefone!");
+          return;
+      }
+      // Clean phone
+      const phone = lead.phone.replace(/\D/g, '');
+      const message = encodeURIComponent(`Olá, vi que a ${lead.companyName} é referência em ${lead.sector}. Gostaria de conversar sobre parcerias.`);
+      window.open(`https://web.whatsapp.com/send?phone=55${phone}&text=${message}`, '_blank');
+  };
+
+  const handleCRMExport = async (lead: Lead) => {
+      toast.promise(
+          crmService.exportToHubSpot(lead),
+          {
+              loading: 'Exportando para HubSpot...',
+              success: 'Exportado com sucesso!',
+              error: 'Erro na exportação'
+          }
+      );
+  };
 
   const columns = {
       new: filteredLeads.filter(l => l.status === 'new'),
@@ -450,11 +474,18 @@ const LeadList: React.FC<LeadListProps> = ({ leads, onSelect, onAddLeads }) => {
 
                         <div className="flex gap-4 w-full">
                             <button 
-                                onClick={() => openGoogleMaps(lead.location || '', lead.companyName)}
-                                className="w-16 h-16 flex items-center justify-center rounded-[1.5rem] bg-slate-100 dark:bg-white/10 text-slate-400 hover:bg-blue-50 hover:text-blue-500 dark:hover:bg-blue-500/20 dark:hover:text-blue-400 transition-colors"
-                                title="Ver no Mapa"
+                                onClick={() => handleWhatsApp(lead)}
+                                className="w-16 h-16 flex items-center justify-center rounded-[1.5rem] bg-green-50 dark:bg-green-900/20 text-green-600 hover:bg-green-100 hover:scale-105 transition-all"
+                                title="WhatsApp Web"
                             >
-                                <Icons.Search />
+                                <Icons.Phone />
+                            </button>
+                            <button
+                                onClick={() => handleCRMExport(lead)}
+                                className="w-16 h-16 flex items-center justify-center rounded-[1.5rem] bg-orange-50 dark:bg-orange-900/20 text-orange-600 hover:bg-orange-100 hover:scale-105 transition-all"
+                                title="Exportar para CRM"
+                            >
+                                <Icons.Upload />
                             </button>
                             <button 
                                 onClick={() => onSelect(lead)}

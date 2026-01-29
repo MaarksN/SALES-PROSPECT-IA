@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Lead } from '../types';
 import { enrichDecisionMakers, generateSalesKit, analyzeCompetitors, checkLocationData } from '../services/geminiService';
+import { enrichmentService } from '../services/enrichmentService';
 import { Icons } from '../constants';
 import { Skeleton } from './Skeleton';
 import { useStore } from '../store/useStore';
@@ -41,6 +42,35 @@ const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onUpdate }) => {
     } finally {
         setLoading(false);
     }
+  };
+
+  const handleRealValidation = async () => {
+      if (!lead.cnpj) {
+          toast.error("CNPJ necessário para validação real.");
+          return;
+      }
+      try {
+          setLoading(true);
+          const data = await enrichmentService.validateCNPJ(lead.cnpj);
+          if (data) {
+              const updated = {
+                  ...lead,
+                  companyName: data.nome_fantasia || data.razao_social || lead.companyName,
+                  address: `${data.logradouro}, ${data.numero} - ${data.bairro}, ${data.municipio} - ${data.uf}`,
+                  phone: data.ddd_telefone_1 ? `55${data.ddd_telefone_1}` : lead.phone,
+                  location: `${data.municipio}, ${data.uf}`,
+                  cnae: data.cnae_fiscal_descricao
+              };
+              onUpdate(updated);
+              toast.success("Dados validados na Receita Federal!");
+          } else {
+              toast.error("CNPJ não encontrado ou inválido.");
+          }
+      } catch (e) {
+          toast.error("Erro na validação.");
+      } finally {
+          setLoading(false);
+      }
   };
 
   const handleSalesMachine = async () => {
@@ -307,13 +337,24 @@ const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onUpdate }) => {
                   </div>
                   <h3 className="text-xl font-bold mb-2">Dados Ausentes</h3>
                   <p className="text-slate-500 mb-6 max-w-md">Utilize a Inteligência Artificial para descobrir quem são os tomadores de decisão, concorrentes e validar localização real.</p>
-                  <button 
-                    onClick={handleEnrichment} 
-                    disabled={loading}
-                    className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg hover:shadow-xl transition-all flex items-center gap-2 disabled:opacity-50"
-                  >
-                    {loading ? <Icons.Refresh /> : '⚡ Enriquecer (1 Crédito)'} 
-                  </button>
+                  <div className="flex gap-4">
+                    <button
+                        onClick={handleEnrichment}
+                        disabled={loading}
+                        className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg hover:shadow-xl transition-all flex items-center gap-2 disabled:opacity-50"
+                    >
+                        {loading ? <Icons.Refresh /> : '⚡ Enriquecer (1 Crédito)'}
+                    </button>
+                    {lead.cnpj && (
+                        <button
+                            onClick={handleRealValidation}
+                            disabled={loading}
+                            className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg hover:shadow-xl transition-all flex items-center gap-2 disabled:opacity-50"
+                        >
+                            <Icons.Check /> Validar Receita
+                        </button>
+                    )}
+                  </div>
                 </div>
               ) : !loading && (
                 <>

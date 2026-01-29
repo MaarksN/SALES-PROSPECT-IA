@@ -97,6 +97,14 @@ export interface DashboardStats {
   projectedRevenue: number;
 }
 
+export interface Subscription {
+  id: string;
+  userId: string;
+  status: 'active' | 'canceled' | 'past_due';
+  plan: 'free' | 'pro' | 'enterprise';
+  currentPeriodEnd?: string;
+}
+
 // === NEW TYPES FOR SALES TOOLS & AI ===
 
 export type ToolCategory = 'prospecting' | 'enrichment' | 'copywriting' | 'strategy' | 'closing';
