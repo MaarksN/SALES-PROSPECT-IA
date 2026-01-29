@@ -85,7 +85,7 @@ const callGeminiAPI = async (model: string, contents: any, config?: GenerateConf
 /**
  * Helper to convert simplified schema to Gemini API Schema
  */
-const convertToGeminiSchema = (simpleSchema: Record<string, string>): Schema => {
+export const convertToGeminiSchema = (simpleSchema: Record<string, string>): Schema => {
   const properties: Record<string, Schema> = {};
   
   Object.entries(simpleSchema).forEach(([key, value]) => {
