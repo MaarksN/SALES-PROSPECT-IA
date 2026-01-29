@@ -12,6 +12,7 @@ import { Skeleton } from './Skeleton';
 import { useStore } from '../store/useStore'; // Zustand
 import { toast } from 'react-hot-toast';
 import { LeadCard } from './LeadCard';
+import Button from '../src/components/ui/Button';
 
 interface LeadListProps {
   leads: Lead[];
@@ -302,20 +303,22 @@ const LeadList: React.FC<LeadListProps> = ({ leads, onSelect, onAddLeads }) => {
                  </button>
              </div>
 
-             <button 
+             <Button
                 onClick={() => fileInputRef.current?.click()}
-                className="px-6 py-4 rounded-[2rem] font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 hover:bg-slate-50 transition-all flex items-center gap-2"
+                variant="secondary"
+                className="rounded-[2rem]"
                 title="Importar CSV"
              >
                 <Icons.Upload /> Importar
-             </button>
-             <button 
+             </Button>
+             <Button
                 onClick={exportCSV}
-                className="px-6 py-4 rounded-[2rem] font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 hover:bg-slate-50 transition-all flex items-center gap-2"
+                variant="secondary"
+                className="rounded-[2rem]"
                 title="Exportar para CSV"
              >
                 <Icons.Check /> Exportar
-             </button>
+             </Button>
              <button 
                 onClick={() => setShowAISearch(!showAISearch)}
                 className={`relative px-8 py-4 rounded-[2rem] font-bold text-lg shadow-2xl hover:scale-105 transition-all flex items-center gap-3 overflow-hidden ${showAISearch ? 'bg-slate-200 text-slate-600' : 'bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow-amber-500/30 ring-2 ring-amber-400/50'}`}

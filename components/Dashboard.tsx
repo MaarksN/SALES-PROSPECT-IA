@@ -4,8 +4,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { SavedGen } from '../types';
 import { Icons } from '../constants';
 import { useTranslation } from 'react-i18next';
-import { useStore } from '../store/useStore';
-import { useLocalStorage } from '../hooks/useLocalStorage';
+import { useDashboardMetrics } from '../src/hooks/useDashboard';
 
 const weeklyData = [
   { name: 'Seg', leads: 4, value: 2400 },
@@ -21,36 +20,14 @@ const COLORS = ['#8b5cf6', '#f59e0b', '#3b82f6', '#ec4899'];
 
 const Dashboard: React.FC = () => {
   const { t } = useTranslation();
-  const leads = useStore(state => state.leads);
-  const [savedGens] = useLocalStorage<SavedGen[]>('sales_ai_history', []);
-
-  // Compute Stats from Real Store Data
-  const stats = useMemo(() => {
-    return {
-        totalLeads: leads.length,
-        qualifiedLeads: leads.filter(l => l.score > 70).length,
-        conversionRate: leads.length > 0 ? ((leads.filter(l => l.status === 'won').length / leads.length) * 100).toFixed(1) : 0,
-        projectedRevenue: leads.length * 15000 // Mock value per lead
-    }
-  }, [leads]);
+  const { leads, stats, pieData: rawPieData, toolStats, savedGens } = useDashboardMetrics();
 
   const pieData = useMemo(() => [
-      { name: t('new'), value: leads.filter(l => l.status === 'new').length },
-      { name: t('qualified'), value: leads.filter(l => l.status === 'qualifying').length },
-      { name: t('negotiation'), value: leads.filter(l => l.status === 'negotiation').length },
-      { name: t('closed'), value: leads.filter(l => l.status === 'won').length },
-  ].filter(d => d.value > 0), [leads, t]);
-
-  const toolStats = React.useMemo(() => {
-      const counts: Record<string, number> = {};
-      savedGens.forEach(gen => {
-          counts[gen.toolName] = (counts[gen.toolName] || 0) + 1;
-      });
-      return Object.entries(counts)
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 5)
-          .map(([name, count]) => ({ name: name.split('.')[1] || name, count }));
-  }, [savedGens]);
+      { name: t('new'), value: rawPieData.new },
+      { name: t('qualified'), value: rawPieData.qualifying },
+      { name: t('negotiation'), value: rawPieData.negotiation },
+      { name: t('closed'), value: rawPieData.won },
+  ].filter(d => d.value > 0), [rawPieData, t]);
 
   return (
     <div className="space-y-8 pb-20 animate-in fade-in duration-500">
