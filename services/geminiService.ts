@@ -27,58 +27,76 @@ interface GenerateConfig {
     [key: string]: any;
 }
 
+const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+
+async function fetchWithBackoff(fn: () => Promise<any>, retries = 3, wait = 1000): Promise<any> {
+  try {
+    return await fn();
+  } catch (error: any) {
+    if (retries > 0 && (error.status === 429 || error.message?.includes('429'))) {
+      console.warn(`Rate limited. Retrying in ${wait}ms...`);
+      await delay(wait);
+      return fetchWithBackoff(fn, retries - 1, wait * 2);
+    }
+    throw error;
+  }
+}
+
 /**
  * Helper to call the BFF endpoint.
  * Replaces direct GoogleGenAI SDK usage on the client.
  */
 const callGeminiAPI = async (model: string, contents: any, config?: GenerateConfig): Promise<any> => {
-    try {
-        // 1. Get Session Token for Security
-        const { data: { session } } = await supabase.auth.getSession();
+    return fetchWithBackoff(async () => {
+        try {
+            // 1. Get Session Token for Security
+            const { data: { session } } = await supabase.auth.getSession();
 
-        const headers: Record<string, string> = {
-            'Content-Type': 'application/json',
-        };
+            const headers: Record<string, string> = {
+                'Content-Type': 'application/json',
+            };
 
-        if (session?.access_token) {
-            headers['Authorization'] = `Bearer ${session.access_token}`;
-        }
-
-        const response = await fetch('/api/generate', {
-            method: 'POST',
-            headers: headers,
-            body: JSON.stringify({
-                model,
-                contents,
-                config
-            })
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`API Error (${response.status}): ${errorText}`);
-        }
-
-        const data = await response.json();
-
-        // Compatibility shim: Add .text property if missing, extracting from candidates
-        if (data && !('text' in data)) {
-            let textVal = null;
-            if (data.candidates && data.candidates.length > 0) {
-                const candidate = data.candidates[0];
-                if (candidate.content && candidate.content.parts) {
-                    textVal = candidate.content.parts.map((p: any) => p.text || '').join('');
-                }
+            if (session?.access_token) {
+                headers['Authorization'] = `Bearer ${session.access_token}`;
             }
-            // Return a new object with the text property
-            return { ...data, text: textVal };
-        }
 
-        return data;
-    } catch (error) {
-        console.error("BFF Call Failed:", error);
-        throw error;
-    }
+            const response = await fetch('/api/generate', {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify({
+                    model,
+                    contents,
+                    config
+                })
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                // Pass status code in error message for backoff detection
+                throw new Error(`API Error (${response.status}): ${errorText}`);
+            }
+
+            const data = await response.json();
+
+            // Compatibility shim: Add .text property if missing, extracting from candidates
+            if (data && !('text' in data)) {
+                let textVal = null;
+                if (data.candidates && data.candidates.length > 0) {
+                    const candidate = data.candidates[0];
+                    if (candidate.content && candidate.content.parts) {
+                        textVal = candidate.content.parts.map((p: any) => p.text || '').join('');
+                    }
+                }
+                // Return a new object with the text property
+                return { ...data, text: textVal };
+            }
+
+            return data;
+        } catch (error) {
+            console.error("BFF Call Failed:", error);
+            throw error;
+        }
+    });
 };
 
 
