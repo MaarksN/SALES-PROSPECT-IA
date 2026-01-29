@@ -113,6 +113,30 @@ app.post('/api/generate', authenticateUser, async (req, res) => {
     }
 });
 
+// STUB: Image Generation Endpoint (Imagen)
+app.post('/api/generate-image', authenticateUser, async (req, res) => {
+    try {
+        const { prompt, aspectRatio } = req.body;
+        // In a real implementation, this would call Vertex AI 'imagen-3.0-generate-001'
+        // For now, we stub it to allow the frontend to call the BFF structure.
+
+        // Mock successful response
+        console.log(`[BFF] Generating Image for: "${prompt}"`);
+
+        // Return a placeholder or call actual API if configured
+        res.json({
+            images: [
+                {
+                    url: "https://via.placeholder.com/1024x1024.png?text=AI+Image+Generated",
+                    mimeType: "image/png"
+                }
+            ]
+        });
+    } catch (error) {
+         res.status(500).json({ error: "Image generation failed" });
+    }
+});
+
 app.listen(port, () => {
     console.log(`🚀 BFF Server running on http://localhost:${port}`);
 });

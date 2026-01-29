@@ -3,6 +3,7 @@ import React, { useMemo } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
 import { SavedGen } from '../types';
 import { Icons } from '../constants';
+import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 
@@ -19,6 +20,7 @@ const weeklyData = [
 const COLORS = ['#8b5cf6', '#f59e0b', '#3b82f6', '#ec4899'];
 
 const Dashboard: React.FC = () => {
+  const { t } = useTranslation();
   const leads = useStore(state => state.leads);
   const [savedGens] = useLocalStorage<SavedGen[]>('sales_ai_history', []);
 
@@ -33,11 +35,11 @@ const Dashboard: React.FC = () => {
   }, [leads]);
 
   const pieData = useMemo(() => [
-      { name: 'Novos', value: leads.filter(l => l.status === 'new').length },
-      { name: 'Qualificados', value: leads.filter(l => l.status === 'qualifying').length },
-      { name: 'Negociação', value: leads.filter(l => l.status === 'negotiation').length },
-      { name: 'Fechados', value: leads.filter(l => l.status === 'won').length },
-  ].filter(d => d.value > 0), [leads]);
+      { name: t('new'), value: leads.filter(l => l.status === 'new').length },
+      { name: t('qualified'), value: leads.filter(l => l.status === 'qualifying').length },
+      { name: t('negotiation'), value: leads.filter(l => l.status === 'negotiation').length },
+      { name: t('closed'), value: leads.filter(l => l.status === 'won').length },
+  ].filter(d => d.value > 0), [leads, t]);
 
   const toolStats = React.useMemo(() => {
       const counts: Record<string, number> = {};
@@ -55,13 +57,13 @@ const Dashboard: React.FC = () => {
       <div className="flex justify-between items-end">
         <div>
             <h2 className="text-4xl font-black mb-2 bg-gradient-to-r from-blue-600 via-purple-600 to-amber-500 bg-clip-text text-transparent">
-                Command Center
+                {t('command_center')}
             </h2>
-            <p className="text-slate-500 dark:text-slate-400 font-medium text-lg">Visão tática do seu império de vendas.</p>
+            <p className="text-slate-500 dark:text-slate-400 font-medium text-lg">{t('tactical_view')}</p>
         </div>
         <div className="hidden md:flex gap-2">
             <span className="px-4 py-2 bg-green-100 text-green-700 rounded-full text-xs font-bold uppercase tracking-wider flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div> Mercado Ativo
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div> {t('market_active')}
             </span>
         </div>
       </div>
@@ -80,7 +82,7 @@ const Dashboard: React.FC = () => {
                 </div>
                 <span className="text-xs font-bold text-green-500 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-lg">+12%</span>
             </div>
-            <p className="text-slate-500 dark:text-slate-400 font-medium mb-1">Total de Leads</p>
+            <p className="text-slate-500 dark:text-slate-400 font-medium mb-1">{t('total_leads')}</p>
             <p className="text-4xl font-black text-slate-800 dark:text-white">{stats.totalLeads}</p>
           </div>
         </div>
@@ -97,7 +99,7 @@ const Dashboard: React.FC = () => {
                 </div>
                 <span className="text-xs font-bold text-green-500 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-lg">+8%</span>
             </div>
-            <p className="text-slate-500 dark:text-slate-400 font-medium mb-1">Qualificados (IA)</p>
+            <p className="text-slate-500 dark:text-slate-400 font-medium mb-1">{t('qualified_leads')}</p>
             <p className="text-4xl font-black text-slate-800 dark:text-white">{stats.qualifiedLeads}</p>
           </div>
         </div>
@@ -114,7 +116,7 @@ const Dashboard: React.FC = () => {
                 </div>
                 <span className="text-xs font-bold text-red-500 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded-lg">-2%</span>
             </div>
-            <p className="text-slate-500 dark:text-slate-400 font-medium mb-1">Taxa de Conversão</p>
+            <p className="text-slate-500 dark:text-slate-400 font-medium mb-1">{t('conversion_rate')}</p>
             <p className="text-4xl font-black text-slate-800 dark:text-white">{stats.conversionRate}%</p>
           </div>
         </div>
@@ -127,9 +129,9 @@ const Dashboard: React.FC = () => {
                 <div className="p-3 bg-white/10 rounded-2xl text-amber-400 backdrop-blur-md">
                     <span className="text-xl font-bold">$</span>
                 </div>
-                <span className="text-xs font-bold text-amber-300 bg-amber-900/50 px-2 py-1 rounded-lg border border-amber-500/30">Pipeline</span>
+                <span className="text-xs font-bold text-amber-300 bg-amber-900/50 px-2 py-1 rounded-lg border border-amber-500/30">{t('pipeline')}</span>
             </div>
-            <p className="text-slate-300 font-medium mb-1">Receita Projetada</p>
+            <p className="text-slate-300 font-medium mb-1">{t('projected_revenue')}</p>
             <p className="text-3xl font-black bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">
                 R$ {stats.projectedRevenue.toLocaleString('pt-BR', { notation: "compact" })}
             </p>
@@ -144,7 +146,7 @@ const Dashboard: React.FC = () => {
         <div className="lg:col-span-2 bg-white dark:bg-[#0F1629] p-8 rounded-[2.5rem] shadow-xl border border-slate-100 dark:border-white/5 relative overflow-hidden">
              <h3 className="text-xl font-bold mb-6 dark:text-white flex items-center gap-2">
                  <span className="w-2 h-6 bg-blue-500 rounded-full"></span>
-                 Fluxo de Oportunidades
+                 {t('opportunities_flow')}
              </h3>
              <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
@@ -177,13 +179,13 @@ const Dashboard: React.FC = () => {
         <div className="bg-white dark:bg-[#0F1629] p-8 rounded-[2.5rem] shadow-xl border border-slate-100 dark:border-white/5">
              <h3 className="text-xl font-bold mb-6 dark:text-white flex items-center gap-2">
                  <span className="w-2 h-6 bg-amber-500 rounded-full"></span>
-                 Distribuição
+                 {t('distribution')}
              </h3>
              <div className="h-64 relative">
                 <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                     <Pie
-                        data={pieData.length > 0 ? pieData : [{name:'Sem dados', value:1}]}
+                        data={pieData.length > 0 ? pieData : [{name: t('no_data'), value:1}]}
                         cx="50%"
                         cy="50%"
                         innerRadius={60}
@@ -209,7 +211,7 @@ const Dashboard: React.FC = () => {
                 {/* Center Text */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                     <span className="text-3xl font-black text-slate-800 dark:text-white">{leads.length}</span>
-                    <span className="text-xs text-slate-400 uppercase font-bold">Leads</span>
+                    <span className="text-xs text-slate-400 uppercase font-bold">{t('leads_label')}</span>
                 </div>
              </div>
              
@@ -230,7 +232,7 @@ const Dashboard: React.FC = () => {
         <div className="bg-white dark:bg-[#0F1629] p-8 rounded-[2.5rem] shadow-xl border border-slate-100 dark:border-white/5">
             <h3 className="text-xl font-bold mb-6 dark:text-white flex items-center gap-2">
                 <span className="w-2 h-6 bg-purple-600 rounded-full"></span>
-                Top Ferramentas Usadas
+                {t('top_tools')}
             </h3>
             {toolStats.length > 0 ? (
                 <div className="h-60">
@@ -246,7 +248,7 @@ const Dashboard: React.FC = () => {
                 </div>
             ) : (
                 <div className="h-60 flex items-center justify-center text-slate-400 text-sm italic">
-                    Nenhuma ferramenta salva ainda.
+                    {t('no_tools_saved')}
                 </div>
             )}
         </div>
@@ -254,7 +256,7 @@ const Dashboard: React.FC = () => {
         <div className="bg-white dark:bg-[#0F1629] p-8 rounded-[2.5rem] shadow-xl border border-slate-100 dark:border-white/5">
              <h3 className="text-xl font-bold mb-6 dark:text-white flex items-center gap-2">
                 <span className="w-2 h-6 bg-indigo-500 rounded-full"></span>
-                Atividade Recente (IA)
+                {t('recent_activity')}
              </h3>
              <div className="space-y-6">
                 {savedGens.slice(0, 3).map((gen) => (
@@ -264,7 +266,7 @@ const Dashboard: React.FC = () => {
                         </div>
                         <div>
                             <p className="text-slate-800 dark:text-white font-bold">{gen.toolName}</p>
-                            <p className="text-sm text-slate-500 truncate max-w-[200px]">Gerado com sucesso</p>
+                            <p className="text-sm text-slate-500 truncate max-w-[200px]">{t('generated_success')}</p>
                         </div>
                         <span className="ml-auto text-xs font-bold text-slate-400">
                             {new Date(gen.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
@@ -272,7 +274,7 @@ const Dashboard: React.FC = () => {
                     </div>
                 ))}
                 {savedGens.length === 0 && (
-                    <div className="text-center text-slate-400 text-sm">Sem atividade recente</div>
+                    <div className="text-center text-slate-400 text-sm">{t('no_recent_activity')}</div>
                 )}
              </div>
         </div>

@@ -597,8 +597,25 @@ export const checkLocationData = async (companyName: string, city: string) => {
 };
 
 export const generateMarketingImage = async (prompt: string, size: "1K" | "2K" | "4K" = "1K", aspectRatio: string = "1:1") => {
-  console.warn("Image Generation disabled: Requires specialized Imagen model.");
-  return null;
+  try {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      const response = await fetch('/api/generate-image', {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+              ...(session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : {})
+          },
+          body: JSON.stringify({ prompt, size, aspectRatio })
+      });
+
+      if (!response.ok) throw new Error("Image gen failed");
+      const data = await response.json();
+      return data.images?.[0]?.url || null;
+  } catch (error) {
+      console.error("Image Gen Error:", error);
+      return null;
+  }
 };
 
 export const generateVideoAsset = async (prompt: string, aspectRatio: '16:9' | '9:16' = '16:9') => {
