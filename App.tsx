@@ -13,6 +13,7 @@ const ChatBot = React.lazy(() => import('./components/ChatBot'));
 const Login = React.lazy(() => import('./components/Login'));
 
 import LeadModal from './components/LeadModal';
+import SidebarClock from './components/SidebarClock';
 import { Lead } from './types';
 import { useStore } from './store/useStore'; // ZUSTAND
 import { Toaster, toast } from 'react-hot-toast';
@@ -53,7 +54,6 @@ const App: React.FC = () => {
 
   const [darkMode, setDarkMode] = useLocalStorage<boolean>('theme_dark', false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
-  const [currentTime, setCurrentTime] = useState(new Date());
   
   // UX States
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -72,12 +72,6 @@ const App: React.FC = () => {
       document.documentElement.classList.remove('dark');
     }
   }, [darkMode]);
-
-  // Real-time Clock
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
 
   // DYNAMIC FAVICON
   useEffect(() => {
@@ -207,9 +201,7 @@ const App: React.FC = () => {
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Sistema Online</p>
                         <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse shadow-[0_0_10px_#22c55e]"></div>
                     </div>
-                    <p className="text-3xl font-black text-slate-700 dark:text-white tabular-nums tracking-tight">
-                        {currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                    </p>
+                    <SidebarClock />
                     <div className="mt-2 flex items-center gap-2">
                         <div className="w-6 h-6 rounded-full bg-indigo-500 flex items-center justify-center text-white text-xs font-bold">
                             {user.name.charAt(0).toUpperCase()}
