@@ -40,6 +40,8 @@ const mapFieldAlias = (field: string) => {
     return map[field.toLowerCase()] || field;
 };
 
+const COMPARISON_REGEX = /^([a-zA-Z]+)(>=|<=|>|<|=)(.+)$/;
+
 const checkCondition = (lead: Lead, term: string): boolean => {
     let cleanTerm = term;
     let negate = false;
@@ -55,7 +57,7 @@ const checkCondition = (lead: Lead, term: string): boolean => {
     let match = false;
     const lowerTerm = cleanTerm.toLowerCase();
 
-    const comparisonMatch = cleanTerm.match(/^([a-zA-Z]+)(>=|<=|>|<|=)(.+)$/);
+    const comparisonMatch = cleanTerm.match(COMPARISON_REGEX);
     
     if (comparisonMatch) {
         const [, fieldRaw, operator, valueRaw] = comparisonMatch;
