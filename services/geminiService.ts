@@ -35,6 +35,47 @@ interface GenerateConfig {
     [key: string]: any;
 }
 
+// Simple in-memory LRU cache to prevent memory leaks and shared state
+class SimpleLRUCache {
+  private cache = new Map<string, any>();
+  private readonly maxSize: number;
+
+  constructor(maxSize: number = 50) {
+    this.maxSize = maxSize;
+  }
+
+  get(key: string): any {
+    if (!this.cache.has(key)) return undefined;
+    const value = this.cache.get(key);
+    // Refresh LRU: delete and set again to move to end of Map
+    this.cache.delete(key);
+    this.cache.set(key, value);
+    // Return deep copy to prevent side effects
+    return JSON.parse(JSON.stringify(value));
+  }
+
+  set(key: string, value: any): void {
+    if (this.cache.has(key)) {
+      this.cache.delete(key);
+    } else if (this.cache.size >= this.maxSize) {
+      // Remove oldest (first inserted/accessed)
+      const firstKey = this.cache.keys().next().value;
+      if (firstKey) this.cache.delete(firstKey);
+    }
+    this.cache.set(key, value);
+  }
+
+  has(key: string): boolean {
+    return this.cache.has(key);
+  }
+}
+
+const memoryCache = new SimpleLRUCache(50);
+
+const generateCacheKey = (prefix: string, ...args: any[]) => {
+  return `${prefix}:${JSON.stringify(args)}`;
+};
+
 /**
  * Helper to convert simplified schema to Gemini API Schema
  */
@@ -95,6 +136,11 @@ export const executeAITool = async (
   userContext?: UserContext,
   simpleSchema?: Record<string, string>
 ): Promise<string> => {
+  const cacheKey = generateCacheKey('executeAITool', promptTemplate, inputs, systemRole, userContext, simpleSchema);
+  if (memoryCache.has(cacheKey)) {
+    return memoryCache.get(cacheKey);
+  }
+
   try {
     // 1. Interpolação de Variáveis
     let finalPrompt = promptTemplate;
@@ -148,12 +194,16 @@ export const executeAITool = async (
     if (simpleSchema && textResponse) {
        try {
          const json = JSON.parse(textResponse);
-         return JSON.stringify(json, null, 2);
+         const result = JSON.stringify(json, null, 2);
+         memoryCache.set(cacheKey, result);
+         return result;
        } catch (e) {
+         memoryCache.set(cacheKey, textResponse);
          return textResponse;
        }
     }
 
+    memoryCache.set(cacheKey, textResponse);
     return textResponse;
 
   } catch (error: any) {
@@ -167,6 +217,11 @@ export const executeAITool = async (
  * O núcleo cognitivo para inteligência B2B.
  */
 export const executeBirthubEngine = async (target: string): Promise<BirthubAnalysisResult | null> => {
+  const cacheKey = generateCacheKey('executeBirthubEngine', target);
+  if (memoryCache.has(cacheKey)) {
+    return memoryCache.get(cacheKey);
+  }
+
   try {
     const freshAi = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
@@ -309,7 +364,9 @@ export const executeBirthubEngine = async (target: string): Promise<BirthubAnaly
         });
       }
 
-      return { dossier, sources };
+      const result = { dossier, sources };
+      memoryCache.set(cacheKey, result);
+      return result;
     }
     return null;
 
@@ -364,6 +421,11 @@ export const searchNewLeads = async (
   size: string,
   quantity: number
 ): Promise<Partial<Lead>[]> => {
+  const cacheKey = generateCacheKey('searchNewLeads', sector, location, keywords, size, quantity);
+  if (memoryCache.has(cacheKey)) {
+    return memoryCache.get(cacheKey);
+  }
+
   try {
     const prompt = `Atue como um especialista de elite em inteligência de vendas B2B.
     Encontre EXATAMENTE ${quantity} empresas reais e ativas no setor de "${sector}" localizadas em "${location}".
@@ -411,7 +473,9 @@ export const searchNewLeads = async (
     });
 
     if (response.text) {
-      return JSON.parse(response.text);
+      const result = JSON.parse(response.text);
+      memoryCache.set(cacheKey, result);
+      return result;
     }
     return [];
   } catch (error) {
@@ -424,6 +488,11 @@ export const searchNewLeads = async (
  * FEATURE 30: Decision Maker Matching (Enrichment)
  */
 export const enrichDecisionMakers = async (companyName: string): Promise<DecisionMaker[]> => {
+  const cacheKey = generateCacheKey('enrichDecisionMakers', companyName);
+  if (memoryCache.has(cacheKey)) {
+    return memoryCache.get(cacheKey);
+  }
+
   try {
     const prompt = `Identifique cargos prováveis de tomadores de decisão na empresa ${companyName}. 
     Foque em Diretores, Gerentes e C-Level. Retorne 3 personas.`;
@@ -448,7 +517,9 @@ export const enrichDecisionMakers = async (companyName: string): Promise<Decisio
     });
 
     if (response.text) {
-      return JSON.parse(response.text);
+      const result = JSON.parse(response.text);
+      memoryCache.set(cacheKey, result);
+      return result;
     }
     return [];
   } catch (error) {
@@ -461,6 +532,11 @@ export const enrichDecisionMakers = async (companyName: string): Promise<Decisio
  * FEATURE 23, 25, 32, 33: Full Sales Machine (Cadence, Scripts, Email)
  */
 export const generateSalesKit = async (companyName: string, sector: string): Promise<SalesKit | null> => {
+  const cacheKey = generateCacheKey('generateSalesKit', companyName, sector);
+  if (memoryCache.has(cacheKey)) {
+    return memoryCache.get(cacheKey);
+  }
+
   try {
     const prompt = `Crie um Kit de Vendas B2B completo para prospectar a empresa ${companyName} (${sector}).
     Língua: Português (Brasil). Tom: Consultivo e Profissional.
@@ -513,7 +589,9 @@ export const generateSalesKit = async (companyName: string, sector: string): Pro
     });
 
     if (response.text) {
-      return JSON.parse(response.text);
+      const result = JSON.parse(response.text);
+      memoryCache.set(cacheKey, result);
+      return result;
     }
     return null;
   } catch (error) {
@@ -523,6 +601,11 @@ export const generateSalesKit = async (companyName: string, sector: string): Pro
 };
 
 export const analyzeCompetitors = async (companyName: string): Promise<Competitor[]> => {
+  const cacheKey = generateCacheKey('analyzeCompetitors', companyName);
+  if (memoryCache.has(cacheKey)) {
+    return memoryCache.get(cacheKey);
+  }
+
   try {
     const prompt = `Liste 3 concorrentes diretos ou indiretos para ${companyName} no mercado brasileiro e seu ponto forte principal.`;
 
@@ -545,7 +628,9 @@ export const analyzeCompetitors = async (companyName: string): Promise<Competito
     });
 
     if (response.text) {
-      return JSON.parse(response.text);
+      const result = JSON.parse(response.text);
+      memoryCache.set(cacheKey, result);
+      return result;
     }
     return [];
   } catch (error) {
@@ -555,6 +640,11 @@ export const analyzeCompetitors = async (companyName: string): Promise<Competito
 };
 
 export const checkLocationData = async (companyName: string, city: string) => {
+  const cacheKey = generateCacheKey('checkLocationData', companyName, city);
+  if (memoryCache.has(cacheKey)) {
+    return memoryCache.get(cacheKey);
+  }
+
   try {
     const response = await ai.models.generateContent({
       model: "gemini-1.5-flash",
@@ -563,6 +653,7 @@ export const checkLocationData = async (companyName: string, city: string) => {
         tools: [{ googleMaps: {} }],
       },
     });
+    memoryCache.set(cacheKey, response.text);
     return response.text;
   } catch (error) {
     console.error("Maps Error:", error);
@@ -586,12 +677,18 @@ export const generateSpeech = async (text: string) => {
 };
 
 export const deepReasoning = async (query: string) => {
+  const cacheKey = generateCacheKey('deepReasoning', query);
+  if (memoryCache.has(cacheKey)) {
+    return memoryCache.get(cacheKey);
+  }
+
   try {
     const response = await ai.models.generateContent({
       model: "gemini-1.5-pro",
       contents: query,
       // Removed thinkingConfig as it's not standard in 1.5 stable
     });
+    memoryCache.set(cacheKey, response.text);
     return response.text;
   } catch (error) {
     console.error("Thinking Error:", error);
