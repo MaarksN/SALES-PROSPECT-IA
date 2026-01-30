@@ -4,6 +4,8 @@ const { GoogleGenAI } = require('@google/genai');
 const { createClient } = require('@supabase/supabase-js');
 const path = require('path');
 const dotenv = require('dotenv');
+const swaggerUi = require('swagger-ui-express');
+const swaggerJsdoc = require('swagger-jsdoc');
 
 // Load env vars from root .env file
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
@@ -84,7 +86,28 @@ const authenticateUser = async (req, res, next) => {
     }
 };
 
+// Swagger Setup
+const swaggerOptions = {
+  definition: {
+    openapi: '3.0.0',
+    info: { title: 'Sales Prospector BFF API', version: '1.0.0' },
+  },
+  apis: ['./index.js'], // Since routes are inline for now
+};
+const specs = swaggerJsdoc(swaggerOptions);
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
+
 // Apply Auth Middleware to sensitive endpoints
+
+/**
+ * @openapi
+ * /api/generate:
+ *   post:
+ *     description: Proxy to Google Gemini API
+ *     responses:
+ *       200:
+ *         description: AI generated content
+ */
 app.post('/api/generate', authenticateUser, async (req, res) => {
     try {
         const { model, contents, config } = req.body;

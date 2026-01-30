@@ -8,6 +8,9 @@ import { Icons } from '../constants';
 import { Skeleton } from './Skeleton';
 import { useStore } from '../store/useStore';
 import { toast } from 'react-hot-toast';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 
 interface LeadModalProps {
   lead: Lead;
@@ -15,12 +18,34 @@ interface LeadModalProps {
   onUpdate: (updatedLead: Lead) => void;
 }
 
+const schema = z.object({
+    companyName: z.string().min(1, "Nome da empresa é obrigatório"),
+    phone: z.string().optional(),
+    notes: z.string().optional(),
+    status: z.enum(['new', 'qualifying', 'contacted', 'negotiation', 'won', 'lost'])
+});
+
 const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onUpdate }) => {
   const [activeTab, setActiveTab] = useState<'details' | 'enrichment' | 'sales_machine' | 'execution'>('details');
   const [loading, setLoading] = useState(false);
   const [mapsResult, setMapsResult] = useState<string | null>(null);
   
   const decrementCredits = useStore(state => state.decrementCredits);
+
+  const { register, handleSubmit, formState: { errors } } = useForm({
+      resolver: zodResolver(schema),
+      defaultValues: {
+          companyName: lead.companyName,
+          phone: lead.phone,
+          notes: lead.notes,
+          status: lead.status
+      }
+  });
+
+  const onSubmitDetails = (data: any) => {
+      onUpdate({ ...lead, ...data });
+      toast.success("Dados atualizados!");
+  };
 
   const handleEnrichment = async () => {
     try {
@@ -243,46 +268,43 @@ const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onUpdate }) => {
           {activeTab === 'details' && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 animate-in fade-in slide-in-from-bottom-2">
               <div className="md:col-span-2 space-y-6">
-                 {/* Stack Card */}
-                 <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
-                    <h3 className="font-bold text-lg mb-4 flex items-center gap-2">🛠️ Tech Stack & Dados</h3>
-                    <div className="flex flex-wrap gap-2 mb-4">
-                        {lead.techStack?.map(tech => (
-                            <span key={tech} className="px-3 py-1 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-lg text-sm font-medium dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-800">{tech}</span>
-                        )) || <span className="text-slate-400 italic">Nenhuma tecnologia identificada.</span>}
-                    </div>
-                    <div className="grid grid-cols-2 gap-4 mt-4">
-                         <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
-                             <span className="text-xs text-slate-500 uppercase font-bold">Telefone</span>
-                             <p className="font-medium">{lead.phone || '—'}</p>
-                         </div>
-                         <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
-                             <span className="text-xs text-slate-500 uppercase font-bold">CNPJ</span>
-                             <p className="font-medium">{lead.cnpj || 'Consultar'}</p>
-                         </div>
-                         <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg col-span-2">
-                            <span className="text-xs text-slate-500 uppercase font-bold">Website</span>
-                             <p className="font-medium text-blue-500 truncate">{lead.website || '—'}</p>
-                         </div>
-                    </div>
-                 </div>
+                 {/* Editable Form */}
+                 <form id="lead-form" onSubmit={handleSubmit(onSubmitDetails)} className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+                    <h3 className="font-bold text-lg mb-4 flex items-center gap-2">🛠️ Dados do Lead</h3>
 
-                 {/* Tags */}
-                 <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
-                     <h3 className="font-bold text-lg mb-4 flex items-center gap-2">🏷️ Tags & Notas</h3>
-                     <div className="flex flex-wrap gap-2">
-                        {lead.tags.map(tag => (
-                            <span key={tag} className="px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-sm font-medium dark:bg-slate-700 dark:text-slate-300">#{tag}</span>
-                        ))}
-                        <button className="px-3 py-1 border border-dashed border-slate-300 text-slate-400 rounded-full text-sm hover:border-indigo-500 hover:text-indigo-500 transition-colors">+ Adicionar</button>
-                     </div>
-                     <textarea 
-                        className="w-full mt-4 p-3 rounded-lg border border-slate-200 dark:bg-slate-900 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
-                        placeholder="Adicione notas sobre o lead aqui..."
-                        defaultValue={lead.notes}
-                        rows={5}
-                     ></textarea>
-                 </div>
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome da Empresa</label>
+                            <input {...register('companyName')} className="w-full p-2 rounded border dark:bg-slate-900 dark:border-slate-600" />
+                            {errors.companyName && <span className="text-red-500 text-xs">{errors.companyName.message}</span>}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                             <div>
+                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Telefone</label>
+                                 <input {...register('phone')} className="w-full p-2 rounded border dark:bg-slate-900 dark:border-slate-600" />
+                             </div>
+                             <div>
+                                 <span className="block text-xs font-bold text-slate-500 uppercase mb-1">CNPJ</span>
+                                 <p className="p-2 bg-slate-50 dark:bg-slate-900 rounded border border-transparent">{lead.cnpj || '—'}</p>
+                             </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Notas</label>
+                            <textarea
+                                {...register('notes')}
+                                className="w-full p-3 rounded-lg border border-slate-200 dark:bg-slate-900 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                                rows={5}
+                                placeholder="Adicione notas..."
+                            ></textarea>
+                        </div>
+
+                        <button type="submit" className="w-full py-2 bg-indigo-50 text-indigo-600 font-bold rounded hover:bg-indigo-100 transition-colors">
+                            Salvar Alterações
+                        </button>
+                    </div>
+                 </form>
               </div>
 
               {/* Sidebar Stats */}
@@ -327,8 +349,7 @@ const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onUpdate }) => {
                   <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
                       <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Status do Pipeline</label>
                       <select 
-                        value={lead.status}
-                        onChange={(e) => onUpdate({...lead, status: e.target.value as any})}
+                        {...register('status')}
                         className="w-full p-2 rounded-lg bg-slate-50 border border-slate-200 dark:bg-slate-700 dark:border-slate-600 font-medium"
                       >
                         <option value="new">🔵 Novo</option>
