@@ -22,6 +22,9 @@ export default defineConfig(({ mode }) => {
       build: {
         manifest: true,
       },
+      optimizeDeps: {
+        include: ['react-window', 'react-virtualized-auto-sizer']
+      },
       plugins: [
         react(),
         checker({ typescript: true }),

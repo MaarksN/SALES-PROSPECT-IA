@@ -13,6 +13,49 @@ import { supabase } from '../lib/supabase';
 // Using stable model version
 const modelName = 'gemini-1.5-flash';
 
+// Simple LRU Cache implementation
+class SimpleLRUCache<K, V> {
+  private map: Map<K, V>;
+  private max: number;
+
+  constructor(max: number = 50) {
+    this.map = new Map<K, V>();
+    this.max = max;
+  }
+
+  get(key: K): V | undefined {
+    const item = this.map.get(key);
+    if (item) {
+      // refresh key
+      this.map.delete(key);
+      this.map.set(key, item);
+    }
+    return item;
+  }
+
+  set(key: K, value: V): void {
+    if (this.map.has(key)) {
+      this.map.delete(key);
+    } else if (this.map.size >= this.max) {
+      const firstKey = this.map.keys().next().value;
+      if (firstKey !== undefined) {
+        this.map.delete(firstKey);
+      }
+    }
+    this.map.set(key, value);
+  }
+
+  has(key: K): boolean {
+    return this.map.has(key);
+  }
+}
+
+const memoryCache = new SimpleLRUCache<string, any>(50);
+
+const generateCacheKey = (...args: any[]): string => {
+  return args.map(arg => JSON.stringify(arg)).join('|');
+};
+
 // Interface to replace 'any' for config
 interface GenerateConfig {
     temperature?: number;
@@ -448,6 +491,7 @@ export const executeBirthubEngine = async (target: string): Promise<BirthubAnaly
                 }
               }
             }
+          }
         }
     };
 
@@ -617,6 +661,10 @@ export const enrichDecisionMakers = async (companyName: string): Promise<Decisio
     const json = await response.json();
     const text = json.text || json.candidates?.[0]?.content?.parts?.[0]?.text;
     return text ? JSON.parse(text) : [];
+  } catch (error) {
+    console.error("Decision Makers Error:", error);
+    return [];
+  }
 };
 
 export const generateSalesKit = async (companyName: string, sector: string): Promise<SalesKit | null> => {
