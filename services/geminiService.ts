@@ -129,6 +129,9 @@ const callGeminiAPI = async (model: string, contents: any, config?: GenerateConf
                     if (candidate.content && candidate.content.parts) {
                         textVal = candidate.content.parts.map((p: any) => p.text || '').join('');
                     }
+                } else if (data.text) {
+                     // Sometimes data.text is at top level
+                     textVal = data.text;
                 }
                 // Return a new object with the text property
                 return { ...data, text: textVal };
@@ -244,7 +247,12 @@ export const executeAITool = async (
 
     const response = await callGeminiAPI(modelName, contents, generateConfig);
 
-    if (!response.ok) {
+    // If callGeminiAPI returns undefined (e.g. from a mock), throw
+    if (!response) {
+        throw new Error("API Error: undefined response");
+    }
+
+    if (!response.ok && typeof response.ok !== 'undefined') {
         throw new Error(`API Error: ${response.statusText}`);
     }
 
@@ -286,6 +294,7 @@ export const executeAITool = async (
          memoryCache.set(cacheKey, result);
          return result;
        } catch (e) {
+         // Fallback to text if JSON parsing fails but schema was requested
          memoryCache.set(cacheKey, textResponse);
          return textResponse;
        }
