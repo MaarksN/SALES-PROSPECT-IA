@@ -1,21 +1,24 @@
-# Node.js 18 Base Image
-FROM node:18-alpine
+# Build Stage
+FROM node:18-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
 
-# Working Directory
+# Production Stage
+FROM node:18-alpine
 WORKDIR /app
 
-# Install Dependencies
-COPY package*.json ./
-RUN npm install --production
+# Install simple static server
+RUN npm install -g serve
 
-# Copy Source
-COPY . .
+# Copy built assets
+COPY --from=builder /app/dist ./dist
 
-# Build (if needed)
-# RUN npm run build
+# Use non-root user
+USER node
 
-# Expose Port
 EXPOSE 3000
 
-# Start Command
-CMD ["node", "server/index.js"]
+CMD ["serve", "-s", "dist", "-l", "3000"]

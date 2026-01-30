@@ -3,27 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- OG Meta Tags -->
+    <meta property="og:title" content="Sales Prospector AI" />
+    <meta property="og:description" content="AI-powered sales prospecting and intelligence tool." />
+    <meta property="og:image" content="/og-image.png" />
+    <meta property="og:type" content="website" />
+
+    <!-- Resource Hints -->
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+
     <title>SALES PROSPECTOR AI INTELLIGENCE</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        darkMode: 'class',
-        theme: {
-          extend: {
-            colors: {
-              primary: {
-                50: '#f0f9ff',
-                100: '#e0f2fe',
-                500: '#0ea5e9',
-                600: '#0284c7',
-                700: '#0369a1',
-                900: '#0c4a6e',
-              }
-            }
-          }
-        }
-      }
-    </script>
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
       body {
@@ -62,6 +52,10 @@
 </head>
   <body class="bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 transition-colors duration-200">
     <div id="root"></div>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <script nomodule>
+      document.body.innerHTML = '<div style="padding: 20px; text-align: center;">Your browser is too old. Please upgrade to a modern browser.</div>';
+    </script>
     <script type="module" src="/index.tsx"></script>
   </body>
 </html>

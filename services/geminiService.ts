@@ -700,6 +700,7 @@ export const analyzeCompetitors = async (companyName: string): Promise<Competito
               name: { type: Type.STRING },
               strength: { type: Type.STRING }
             }
+          }
         }
     });
 
