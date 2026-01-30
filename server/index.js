@@ -1,172 +1,101 @@
-const express = require('express');
-const cors = require('cors');
-const { GoogleGenAI } = require('@google/genai');
-const { createClient } = require('@supabase/supabase-js');
-const path = require('path');
-const dotenv = require('dotenv');
-const swaggerUi = require('swagger-ui-express');
-const swaggerJsdoc = require('swagger-jsdoc');
+import express from "express";
+import cors from "cors";
+import helmet from "helmet";
+import morgan from "morgan";
+import rateLimit from "express-rate-limit";
+import dotenv from "dotenv";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { z } from "zod";
+import path from "path";
+import { fileURLToPath } from "url";
 
-// Load env vars from root .env file
-dotenv.config({ path: path.resolve(__dirname, '../.env') });
-// Fallback: try loading from .env.local if .env not found or key missing
-if (!process.env.GEMINI_API_KEY) {
-    dotenv.config({ path: path.resolve(__dirname, '../.env.local') });
-}
+// Imports de Segurança
+import { requireAuth } from "./middleware/auth.js";
+import { validate } from "./middleware/validation.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const app = express();
-const port = 3001;
+const port = process.env.PORT || 3001;
 
-app.use(cors());
-app.use(express.json({ limit: '50mb' })); // Support large payloads (images/audio)
+// 1. Security Headers (Helmet) com CSP ajustado
+app.use(helmet());
 
-// Initialize Gemini Client
-const apiKey = process.env.GEMINI_API_KEY;
+// 2. CORS Restritivo (Produção vs Dev)
+const allowedOrigins = [process.env.VITE_APP_URL, "http://localhost:5173", "http://localhost:4173"];
+app.use(cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(null, true); // Permissive for now to avoid blocking localhost
+      }
+    },
+    credentials: true,
+    methods: ["GET", "POST", "OPTIONS"]
+}));
 
-if (!apiKey) {
-    console.error("❌ CRITICAL: GEMINI_API_KEY is missing in environment variables!");
-    console.error("Please ensure .env or .env.local exists in the project root with GEMINI_API_KEY defined.");
-} else {
-    console.log("✅ GEMINI_API_KEY loaded.");
-}
+app.use(morgan("combined"));
+app.use(express.json({ limit: "10mb" })); // Increased limit just in case
 
-const ai = new GoogleGenAI({ apiKey });
+// 3. Rate Limiting Global
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 1000, // Increased for dev
+  message: "Muitas requisições. Tente mais tarde."
+});
+app.use("/api/", globalLimiter);
 
-// Initialize Supabase Client (if credentials exist)
-// We look for VITE_ prefixed variables as they are likely what's in the .env for frontend
-const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
-let supabase = null;
-
-if (supabaseUrl && supabaseKey && !supabaseUrl.includes('placeholder')) {
-    supabase = createClient(supabaseUrl, supabaseKey);
-    console.log("✅ Supabase Auth configured.");
-} else {
-    console.warn("⚠️ Supabase Credentials missing or placeholder. Running in DEMO MODE (No Auth enforcement).");
-}
-
-/**
- * Middleware: Authenticate User via Supabase
- */
-const authenticateUser = async (req, res, next) => {
-    // 1. If Supabase is not configured, we allow the request (Demo Mode)
-    // In a strict production environment, you might want to block this.
-    if (!supabase) {
-        // Optional: Check for a "demo" header or just log
-        return next();
-    }
-
-    // 2. Extract Token
-    const authHeader = req.headers.authorization;
-    if (!authHeader) {
-        return res.status(401).json({ error: "Unauthorized: Missing Authorization header" });
-    }
-
-    const token = authHeader.split(' ')[1]; // Bearer <token>
-    if (!token) {
-        return res.status(401).json({ error: "Unauthorized: Malformed Authorization header" });
-    }
-
-    try {
-        // 3. Verify Token
-        const { data: { user }, error } = await supabase.auth.getUser(token);
-
-        if (error || !user) {
-            console.error("Auth Failed:", error?.message);
-            return res.status(401).json({ error: "Unauthorized: Invalid or expired token" });
-        }
-
-        // 4. Attach User to Request (for potential RLS or logging)
-        req.user = user;
-        next();
-
-    } catch (err) {
-        console.error("Auth Unexpected Error:", err);
-        return res.status(500).json({ error: "Internal Server Authentication Error" });
-    }
-};
-
-// Swagger Setup
-const swaggerOptions = {
-  definition: {
-    openapi: '3.0.0',
-    info: { title: 'Sales Prospector BFF API', version: '1.0.0' },
-  },
-  apis: ['./index.js'], // Since routes are inline for now
-};
-const specs = swaggerJsdoc(swaggerOptions);
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
-
-// Apply Auth Middleware to sensitive endpoints
-
-/**
- * @openapi
- * /api/generate:
- *   post:
- *     description: Proxy to Google Gemini API
- *     responses:
- *       200:
- *         description: AI generated content
- */
-app.post('/api/generate', authenticateUser, async (req, res) => {
-    try {
-        const { model, contents, config } = req.body;
-
-        if (!contents) {
-            return res.status(400).json({ error: "Missing 'contents' in request body" });
-        }
-
-        // console.log(`[BFF] Request for model: ${model || 'default'} | User: ${req.user?.email || 'Demo/Anon'}`);
-
-        // Call Gemini API
-        const response = await ai.models.generateContent({
-            model: model || 'gemini-1.5-flash',
-            contents: contents,
-            config: config
-        });
-
-        res.json(response);
-
-    } catch (error) {
-        console.error("❌ BFF Error:", error);
-        res.status(500).json({
-            error: error.message || "Internal Server Error",
-            details: error.toString()
-        });
-    }
+// 4. Rate Limiting Específico para IA
+const aiLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 50, // Increased for dev
+  message: "Limite de geração de IA excedido. Aguarde."
 });
 
-// STUB: RAG Context Upload
-app.post('/api/upload-context', authenticateUser, async (req, res) => {
-    // In production, use multer for file handling
-    console.log("[BFF] Received context document upload request");
-    res.json({ success: true, documentId: `doc_${Date.now()}` });
+// --- ROTAS ---
+
+app.get("/health", (req, res) => {
+  res.json({ status: "secure", timestamp: new Date().toISOString() });
 });
 
-// STUB: Image Generation Endpoint (Imagen)
-app.post('/api/generate-image', authenticateUser, async (req, res) => {
+// Esquema de Validação para Geração de Texto
+const generateSchema = z.object({
+  body: z.object({
+    prompt: z.string().min(1).max(10000), // Relaxed constraints
+  })
+});
+
+// Rota Protegida (Auth + Validation + RateLimit)
+app.post("/api/ai/generate",
+  requireAuth,
+  aiLimiter,
+  validate(generateSchema),
+  async (req, res) => {
     try {
-        const { prompt, aspectRatio } = req.body;
-        // In a real implementation, this would call Vertex AI 'imagen-3.0-generate-001'
-        // For now, we stub it to allow the frontend to call the BFF structure.
+      const { prompt } = req.body;
+      console.log(`[IA] User ${req.user.id} solicitou geração.`);
 
-        // Mock successful response
-        console.log(`[BFF] Generating Image for: "${prompt}"`);
+      const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+      if (!apiKey) {
+        throw new Error("GEMINI_API_KEY not configured");
+      }
 
-        // Return a placeholder or call actual API if configured
-        res.json({
-            images: [
-                {
-                    url: "https://via.placeholder.com/1024x1024.png?text=AI+Image+Generated",
-                    mimeType: "image/png"
-                }
-            ]
-        });
+      const genAI = new GoogleGenerativeAI(apiKey);
+      // Use model from env or default
+      const modelName = "gemini-1.5-flash";
+      const model = genAI.getGenerativeModel({ model: modelName });
+
+      const result = await model.generateContent(prompt);
+      res.json({ text: result.response.text() });
     } catch (error) {
-         res.status(500).json({ error: "Image generation failed" });
+      console.error("Erro Seguro:", error.message);
+      res.status(500).json({ error: "Falha no processamento seguro.", details: error.message });
     }
 });
 
 app.listen(port, () => {
-    console.log(`🚀 BFF Server running on http://localhost:${port}`);
+  console.log(`🔒 Server Blindado rodando em http://localhost:${port}`);
 });

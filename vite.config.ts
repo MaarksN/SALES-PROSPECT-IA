@@ -1,37 +1,41 @@
-import path from 'path';
-import { defineConfig, loadEnv } from 'vite';
-import react from '@vitejs/plugin-react';
-import viteImagemin from 'vite-plugin-imagemin';
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import path from "path";
+import { visualizer } from "rollup-plugin-visualizer";
+import compression from "vite-plugin-compression";
 
-export default defineConfig(({ mode }) => {
-    const env = loadEnv(mode, '.', '');
-    return {
-      server: {
-        port: 3000,
-        host: '0.0.0.0',
-        proxy: {
-            '/api': {
-                target: 'http://localhost:3001',
-                changeOrigin: true,
-                secure: false,
-            }
-        }
+export default defineConfig({
+  plugins: [
+    react(),
+    compression(),
+    visualizer({ open: false })
+  ],
+  resolve: {
+    alias: { "@": path.resolve(__dirname, "./src") },
+  },
+  server: {
+    port: 5173,
+    proxy: {
+      "/api": {
+        target: "http://localhost:3001",
+        changeOrigin: true,
+        secure: false,
       },
-      plugins: [
-        react(),
-        viteImagemin({
-          gifsicle: { optimizationLevel: 7 },
-          optipng: { optimizationLevel: 7 },
-          mozjpeg: { quality: 20 },
-          pngquant: { quality: [0.8, 0.9], speed: 4 },
-        }),
-      ],
-      // Removed API Key exposure via 'define'.
-      // Keys are now handled by the BFF server.
-      resolve: {
-        alias: {
-          '@': path.resolve(__dirname, '.'),
-        }
-      }
-    };
+    },
+  },
+  build: {
+    outDir: "dist",
+    sourcemap: false,
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor_react: ["react", "react-dom", "react-router-dom"],
+          vendor_ui: ["framer-motion", "lucide-react", "recharts", "sonner", "clsx", "tailwind-merge"],
+          vendor_utils: ["date-fns", "zod", "axios", "@tanstack/react-query", "zustand"],
+          vendor_db: ["@supabase/supabase-js", "@google/generative-ai"],
+        },
+      },
+    },
+  },
 });

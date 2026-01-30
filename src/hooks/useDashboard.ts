@@ -1,44 +1,28 @@
+import { useQuery } from "@tanstack/react-query";
+import { DashboardStats } from "@/types";
+import { sleep } from "@/lib/utils";
+import { logger } from "@/lib/logger";
 
-import { useMemo } from 'react';
-import { useStore } from '../../store/useStore';
-import { useLocalStorage } from '../../hooks/useLocalStorage';
-import { SavedGen } from '../../types';
+// Mock Fetcher - Em produção, isso seria uma chamada ao Supabase/API
+const fetchDashboardStats = async (): Promise<DashboardStats> => {
+  logger.debug("Fetching dashboard stats...");
+  await sleep(1200); // Simula network latency
 
-export const useDashboardMetrics = () => {
-  const leads = useStore(state => state.leads);
-  const [savedGens] = useLocalStorage<SavedGen[]>('sales_ai_history', []);
-
-  const stats = useMemo(() => {
-    return {
-        totalLeads: leads.length,
-        qualifiedLeads: leads.filter(l => l.score > 70).length,
-        conversionRate: leads.length > 0 ? ((leads.filter(l => l.status === 'won').length / leads.length) * 100).toFixed(1) : 0,
-        projectedRevenue: leads.length * 15000 // Mock value per lead
-    }
-  }, [leads]);
-
-  const pieData = useMemo(() => {
-      // Logic for pie chart data preparation
-      // This is now purely data transformation, decoupled from UI
-      const counts = {
-          new: leads.filter(l => l.status === 'new').length,
-          qualifying: leads.filter(l => l.status === 'qualifying').length,
-          negotiation: leads.filter(l => l.status === 'negotiation').length,
-          won: leads.filter(l => l.status === 'won').length
-      };
-      return counts;
-  }, [leads]);
-
-  const toolStats = useMemo(() => {
-      const counts: Record<string, number> = {};
-      savedGens.forEach(gen => {
-          counts[gen.toolName] = (counts[gen.toolName] || 0) + 1;
-      });
-      return Object.entries(counts)
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 5)
-          .map(([name, count]) => ({ name: name.split('.')[1] || name, count }));
-  }, [savedGens]);
-
-  return { leads, stats, pieData, toolStats, savedGens };
+  // Dados simulados
+  return {
+    totalLeads: 1240,
+    qualifiedLeads: 320,
+    conversionRate: 3.2,
+    creditsUsed: 45
+  };
 };
+
+export function useDashboardStats() {
+  return useQuery({
+    queryKey: ["dashboard-stats"], // Chave única para cache
+    queryFn: fetchDashboardStats,
+    staleTime: 1000 * 60 * 5, // Dados considerados frescos por 5 min
+    refetchOnWindowFocus: false, // Não recarrega ao trocar de aba
+    retry: 1, // Tenta apenas 1 vez se falhar
+  });
+}
