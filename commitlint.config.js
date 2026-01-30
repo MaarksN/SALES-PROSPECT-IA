@@ -8,6 +8,6 @@ export default {
       'api', 'ui', 'db', 'infra', 'ai'
     ]],
     'header-max-length': [2, 'always', 72],
-    'body-min-length': [2, 'always', 10] // Força descrição mínima, indiretamente encoraja ID de tarefa se convencionado
+    'body-min-length': [2, 'always', 10]
   }
 };
