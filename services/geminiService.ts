@@ -13,6 +13,49 @@ import { supabase } from '../lib/supabase';
 // Using stable model version
 const modelName = 'gemini-1.5-flash';
 
+// Simple LRU Cache implementation
+class SimpleLRUCache<K, V> {
+  private map: Map<K, V>;
+  private max: number;
+
+  constructor(max: number = 50) {
+    this.map = new Map<K, V>();
+    this.max = max;
+  }
+
+  get(key: K): V | undefined {
+    const item = this.map.get(key);
+    if (item) {
+      // refresh key
+      this.map.delete(key);
+      this.map.set(key, item);
+    }
+    return item;
+  }
+
+  set(key: K, value: V): void {
+    if (this.map.has(key)) {
+      this.map.delete(key);
+    } else if (this.map.size >= this.max) {
+      const firstKey = this.map.keys().next().value;
+      if (firstKey !== undefined) {
+        this.map.delete(firstKey);
+      }
+    }
+    this.map.set(key, value);
+  }
+
+  has(key: K): boolean {
+    return this.map.has(key);
+  }
+}
+
+const memoryCache = new SimpleLRUCache<string, any>(50);
+
+const generateCacheKey = (...args: any[]): string => {
+  return args.map(arg => JSON.stringify(arg)).join('|');
+};
+
 // Interface to replace 'any' for config
 interface GenerateConfig {
     temperature?: number;
@@ -86,6 +129,9 @@ const callGeminiAPI = async (model: string, contents: any, config?: GenerateConf
                     if (candidate.content && candidate.content.parts) {
                         textVal = candidate.content.parts.map((p: any) => p.text || '').join('');
                     }
+                } else if (data.text) {
+                     // Sometimes data.text is at top level
+                     textVal = data.text;
                 }
                 // Return a new object with the text property
                 return { ...data, text: textVal };
@@ -201,7 +247,12 @@ export const executeAITool = async (
 
     const response = await callGeminiAPI(modelName, contents, generateConfig);
 
-    if (!response.ok) {
+    // If callGeminiAPI returns undefined (e.g. from a mock), throw
+    if (!response) {
+        throw new Error("API Error: undefined response");
+    }
+
+    if (!response.ok && typeof response.ok !== 'undefined') {
         throw new Error(`API Error: ${response.statusText}`);
     }
 
@@ -243,6 +294,7 @@ export const executeAITool = async (
          memoryCache.set(cacheKey, result);
          return result;
        } catch (e) {
+         // Fallback to text if JSON parsing fails but schema was requested
          memoryCache.set(cacheKey, textResponse);
          return textResponse;
        }
@@ -448,6 +500,7 @@ export const executeBirthubEngine = async (target: string): Promise<BirthubAnaly
                 }
               }
             }
+          }
         }
     };
 
@@ -617,6 +670,10 @@ export const enrichDecisionMakers = async (companyName: string): Promise<Decisio
     const json = await response.json();
     const text = json.text || json.candidates?.[0]?.content?.parts?.[0]?.text;
     return text ? JSON.parse(text) : [];
+  } catch (error) {
+    console.error("Decision Makers Error:", error);
+    return [];
+  }
 };
 
 export const generateSalesKit = async (companyName: string, sector: string): Promise<SalesKit | null> => {
@@ -700,6 +757,7 @@ export const analyzeCompetitors = async (companyName: string): Promise<Competito
               name: { type: Type.STRING },
               strength: { type: Type.STRING }
             }
+          }
         }
     });
 

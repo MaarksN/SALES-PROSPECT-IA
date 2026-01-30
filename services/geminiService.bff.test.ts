@@ -13,7 +13,8 @@ describe('geminiService BFF', () => {
     const mockResponse = { text: 'AI Response' };
     (global.fetch as any).mockResolvedValue({
       ok: true,
-      json: async () => mockResponse,
+      json: () => Promise.resolve(mockResponse),
+      body: null, // mock body for stream check
     });
 
     const tool = {

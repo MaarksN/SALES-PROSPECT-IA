@@ -12,6 +12,7 @@ dist
 dist-ssr
 *.local
 .env
+.env.production
 playwright-report
 test-results
 
@@ -25,3 +26,8 @@ test-results
 *.njsproj
 *.sln
 *.sw?
+Thumbs.db
+
+# Generated
+.bolt/
+*.test.ts.snap

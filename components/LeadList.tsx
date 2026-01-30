@@ -1,9 +1,12 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import * as ReactWindow from 'react-window';
+import * as AutoSizerModule from 'react-virtualized-auto-sizer';
+
 // @ts-ignore
-import { FixedSizeList as List } from 'react-window';
+const List = ReactWindow.FixedSizeList || (ReactWindow as any).default?.FixedSizeList || ReactWindow.default?.FixedSizeList;
 // @ts-ignore
-import AutoSizer from 'react-virtualized-auto-sizer';
+const AutoSizer = (AutoSizerModule as any).default || AutoSizerModule;
 import { Lead } from '../types';
 import { Icons } from '../constants';
 import { searchNewLeads } from '../services/geminiService';

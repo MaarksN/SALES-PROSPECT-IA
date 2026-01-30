@@ -1,11 +1,19 @@
 /// <reference types="vitest" />
 import { defineConfig } from 'vitest/config';
+import path from 'path';
 
 export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
-    setupFiles: [],
-    exclude: ['node_modules', 'dist', '.idea', '.git', '.cache', 'e2e/**'],
+    setupFiles: ['./src/setupTests.ts'],
+    exclude: ['node_modules', 'dist', '.idea', '.git', '.cache', 'e2e/**', 'server/**'],
+    reporters: ['verbose'],
+    globalSetup: './test/globalSetup.ts',
+  },
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
   },
 });

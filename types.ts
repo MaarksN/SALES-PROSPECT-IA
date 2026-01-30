@@ -107,7 +107,7 @@ export interface Subscription {
 
 // === NEW TYPES FOR SALES TOOLS & AI ===
 
-export type ToolCategory = 'prospecting' | 'enrichment' | 'copywriting' | 'strategy' | 'closing';
+export type ToolCategory = 'prospecting' | 'enrichment' | 'copywriting' | 'strategy' | 'closing' | 'social' | 'inclusion' | 'utils';
 
 export interface ToolInput {
   name: string;
