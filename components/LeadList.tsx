@@ -12,7 +12,7 @@ import { Skeleton } from './Skeleton';
 import { useStore } from '../store/useStore'; // Zustand
 import { toast } from 'react-hot-toast';
 import { LeadCard } from './LeadCard';
-import Button from '../src/components/ui/Button';
+import Button from './ui/Button';
 
 interface LeadListProps {
   leads: Lead[];
