@@ -117,6 +117,7 @@ export const convertToGeminiSchema = (simpleSchema: Record<string, string>): Sch
     } else if (value === 'boolean') {
       properties[key] = { type: Type.BOOLEAN };
     } else if (value === 'object') {
+       // Generic object for simplicity in this helper
        properties[key] = { type: Type.OBJECT, properties: { data: { type: Type.STRING } } };
     } else {
       properties[key] = { type: Type.STRING };
@@ -132,43 +133,42 @@ export const convertToGeminiSchema = (simpleSchema: Record<string, string>): Sch
 
 /**
  * GENERIC AI TOOL EXECUTOR
+ * Now supports User Context Injection and Structured JSON Output.
  */
 export const executeSalesTool = async (
   tool: AIToolConfig, 
   inputs: Record<string, string>,
-  userContext?: UserContext,
-  onChunk?: (text: string) => void
+  userContext?: UserContext
 ): Promise<string> => {
   return executeAITool(
     tool.promptTemplate, 
     inputs, 
     tool.systemRole || 'Sales Assistant', 
     userContext,
-    tool.outputSchema,
-    onChunk
+    tool.outputSchema
   );
 };
 
+/**
+ * 🚀 MOTOR DE EXECUÇÃO DAS 100 FERRAMENTAS (ATUALIZADO)
+ * Inclui injeção de contexto e suporte a Schema JSON.
+ */
 export const executeAITool = async (
   promptTemplate: string, 
   inputs: Record<string, string>, 
   systemRole: string = 'Assistente de Vendas de Alta Performance',
   userContext?: UserContext,
-  simpleSchema?: Record<string, string>,
-  onChunk?: (text: string) => void
+  simpleSchema?: Record<string, string>
 ): Promise<string> => {
-  const cacheKey = generateCacheKey('executeAITool', promptTemplate, inputs, systemRole, userContext, simpleSchema);
-  if (memoryCache.has(cacheKey)) {
-    return memoryCache.get(cacheKey);
-  }
-
   try {
+    // 1. Interpolação de Variáveis
     let finalPrompt = promptTemplate;
     Object.keys(inputs).forEach(key => {
       const regex = new RegExp(`{{${key}}}`, 'g');
       finalPrompt = finalPrompt.replace(regex, inputs[key] || '');
     });
 
+    // 2. Injeção de Contexto (O "Cérebro" do Usuário)
     let enrichedSystemRole = systemRole;
     if (userContext) {
       enrichedSystemRole += `\n\nCONTEXTO DO USUÁRIO (Obrigatório seguir):
@@ -186,6 +186,7 @@ export const executeAITool = async (
       temperature: 0.7,
     };
 
+    // Support JSON Schema if provided
     if (simpleSchema) {
       generateConfig.responseMimeType = "application/json";
       generateConfig.responseSchema = convertToGeminiSchema(simpleSchema);
@@ -201,54 +202,18 @@ export const executeAITool = async (
 
     const response = await callGeminiAPI(modelName, contents, generateConfig);
 
-    if (!response.ok) {
-        throw new Error(`API Error: ${response.statusText}`);
-    }
+    let textResponse = response.text || "Sem resposta gerada.";
 
-    let textResponse = "Sem resposta gerada.";
-
-    if (onChunk && !simpleSchema && response.body) {
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        textResponse = '';
-
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            const chunk = decoder.decode(value, { stream: true });
-            const lines = chunk.split('\n\n');
-            for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                    const dataStr = line.replace('data: ', '');
-                    if (dataStr === '[DONE]') break;
-                    try {
-                        const data = JSON.parse(dataStr);
-                        if (data.text) {
-                            textResponse += data.text;
-                            onChunk(textResponse);
-                        }
-                    } catch (e) {}
-                }
-            }
-        }
-    } else {
-        const jsonResponse = await response.json();
-        textResponse = jsonResponse.text || jsonResponse.candidates?.[0]?.content?.parts?.[0]?.text || "Sem resposta gerada.";
-    }
-
+    // Pretty Print JSON if applicable
     if (simpleSchema && textResponse) {
        try {
          const json = JSON.parse(textResponse);
-         const result = JSON.stringify(json, null, 2);
-         memoryCache.set(cacheKey, result);
-         return result;
+         return JSON.stringify(json, null, 2);
        } catch (e) {
-         memoryCache.set(cacheKey, textResponse);
          return textResponse;
        }
     }
 
-    memoryCache.set(cacheKey, textResponse);
     return textResponse;
 
   } catch (error: any) {
@@ -258,14 +223,10 @@ export const executeAITool = async (
 };
 
 /**
- * 🕵️‍♂️ BIRTHUB AI v2.1 ENGINE
+ * 🕵️‍♂️ BIRTHUB AI v2.1 ENGINE (LEADHUNTER CORE)
+ * O núcleo cognitivo para inteligência B2B.
  */
 export const executeBirthubEngine = async (target: string): Promise<BirthubAnalysisResult | null> => {
-  const cacheKey = generateCacheKey('executeBirthubEngine', target);
-  if (memoryCache.has(cacheKey)) {
-    return memoryCache.get(cacheKey);
-  }
-
   try {
     const systemPrompt = `Você é o Birthub AI v2.1, o Agente de Prospecção Comercial B2B autônomo.
 
@@ -361,116 +322,54 @@ export const executeBirthubEngine = async (target: string): Promise<BirthubAnaly
             scoring: {
               type: Type.OBJECT,
               properties: {
-                company: {
+                total_score: { type: Type.NUMBER },
+                breakdown: {
                   type: Type.OBJECT,
                   properties: {
-                    legal_name: { type: Type.STRING, nullable: true },
-                    trade_name: { type: Type.STRING, nullable: true },
-                    cnpj: { type: Type.STRING, nullable: true },
-                    industry: { type: Type.STRING, nullable: true },
-                    business_model: { type: Type.STRING, enum: ['B2B', 'B2C', 'Marketplace'], nullable: true },
-                    maturity_level: { type: Type.STRING, enum: ['Early', 'Growth', 'Enterprise'], nullable: true },
-                    employee_range: { type: Type.STRING, nullable: true },
-                    website: { type: Type.STRING, nullable: true },
-                    linkedin_company: { type: Type.STRING, nullable: true },
-                    phone: { type: Type.STRING, nullable: true },
-                    email: { type: Type.STRING, nullable: true },
-                    address: { type: Type.STRING, nullable: true },
+                    tech_fit: { type: Type.NUMBER },
+                    market_timing: { type: Type.NUMBER },
+                    budget_potential: { type: Type.NUMBER },
+                    data_confidence: { type: Type.NUMBER }
                   }
                 },
-                digital_presence: {
-                  type: Type.OBJECT,
-                  properties: {
-                    website_active: { type: Type.BOOLEAN },
-                    linkedin_active: { type: Type.BOOLEAN },
-                    other_channels: { type: Type.ARRAY, items: { type: Type.STRING } }
-                  }
-                },
-                decision_maker: {
-                  type: Type.OBJECT,
-                  properties: {
-                    name: { type: Type.STRING, nullable: true },
-                    role: { type: Type.STRING, nullable: true },
-                    linkedin_profile: { type: Type.STRING, nullable: true },
-                    email: { type: Type.STRING, nullable: true },
-                    phone: { type: Type.STRING, nullable: true },
-                    whatsapp: { type: Type.STRING, nullable: true }
-                  }
-                },
-                technology: {
-                  type: Type.OBJECT,
-                  properties: {
-                    detected_stack: { type: Type.ARRAY, items: { type: Type.STRING } },
-                    crm: { type: Type.STRING, nullable: true },
-                    marketing_tools: { type: Type.ARRAY, items: { type: Type.STRING } },
-                    sales_tools: { type: Type.ARRAY, items: { type: Type.STRING } }
-                  }
-                },
-                signals: {
-                  type: Type.OBJECT,
-                  properties: {
-                    hiring_sales: { type: Type.BOOLEAN },
-                    hiring_marketing: { type: Type.BOOLEAN },
-                    recent_funding: { type: Type.BOOLEAN },
-                    expansion_signals: { type: Type.ARRAY, items: { type: Type.STRING } }
-                  }
-                },
-                scoring: {
-                  type: Type.OBJECT,
-                  properties: {
-                    total_score: { type: Type.NUMBER },
-                    breakdown: {
-                      type: Type.OBJECT,
-                      properties: {
-                        tech_fit: { type: Type.NUMBER },
-                        market_timing: { type: Type.NUMBER },
-                        budget_potential: { type: Type.NUMBER },
-                        data_confidence: { type: Type.NUMBER }
-                      }
-                    },
-                    reasoning: { type: Type.STRING }
-                  }
-                },
-                decision: {
-                  type: Type.OBJECT,
-                  properties: {
-                    status: { type: Type.STRING, enum: ['APPROVED', 'REJECTED', 'REVIEW_NEEDED'] },
-                    confidence_level: { type: Type.STRING, enum: ['LOW', 'MEDIUM', 'HIGH'] }
-                  }
-                },
-                outreach: {
-                  type: Type.OBJECT,
-                  properties: {
-                    recommended_channel: { type: Type.STRING, enum: ['EMAIL', 'WHATSAPP', 'LINKEDIN', 'NONE'] },
-                    subject: { type: Type.STRING, nullable: true },
-                    message: { type: Type.STRING, nullable: true }
-                  }
-                }
+                reasoning: { type: Type.STRING }
+              }
+            },
+            decision: {
+              type: Type.OBJECT,
+              properties: {
+                status: { type: Type.STRING, enum: ['APPROVED', 'REJECTED', 'REVIEW_NEEDED'] },
+                confidence_level: { type: Type.STRING, enum: ['LOW', 'MEDIUM', 'HIGH'] }
+              }
+            },
+            outreach: {
+              type: Type.OBJECT,
+              properties: {
+                recommended_channel: { type: Type.STRING, enum: ['EMAIL', 'WHATSAPP', 'LINKEDIN', 'NONE'] },
+                subject: { type: Type.STRING, nullable: true },
+                message: { type: Type.STRING, nullable: true }
               }
             }
+          }
         }
     };
 
     const response = await callGeminiAPI(modelName, [contentsObj], config);
 
-    const jsonResponse = await response.json();
-    const text = jsonResponse.text || jsonResponse.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (text) {
-      const dossier = JSON.parse(text) as BirthubDossier;
+    if (response.text) {
+      const dossier = JSON.parse(response.text) as BirthubDossier;
       
+      // Extract grounding sources for evidence validation
       const sources: GroundingSource[] = [];
-      if (jsonResponse.candidates?.[0]?.groundingMetadata?.groundingChunks) {
-        jsonResponse.candidates[0].groundingMetadata.groundingChunks.forEach((chunk: any) => {
+      if (response.candidates?.[0]?.groundingMetadata?.groundingChunks) {
+        response.candidates[0].groundingMetadata.groundingChunks.forEach((chunk: any) => {
           if (chunk.web?.uri) {
             sources.push({ title: chunk.web.title, uri: chunk.web.uri });
           }
         });
       }
 
-      const result = { dossier, sources };
-      memoryCache.set(cacheKey, result);
-      return result;
+      return { dossier, sources };
     }
     return null;
 
@@ -520,17 +419,6 @@ export const searchNewLeads = async (
   size: string,
   quantity: number
 ): Promise<Partial<Lead>[]> => {
-  // Stub or implement if needed. Keeping it short for now as the logic is similar.
-  // The user didn't ask to fix this specifically but "Improvements".
-  // I will just implement the generic tool execution which covers most cases.
-  // But this specific function is likely used by LeadList or AILab.
-  // I should implement it via /api/generate as well.
-
-  const cacheKey = generateCacheKey('searchNewLeads', sector, location, keywords, size, quantity);
-  if (memoryCache.has(cacheKey)) {
-    return memoryCache.get(cacheKey);
-  }
-
   try {
     const prompt = `Atue como um especialista de elite em inteligência de vendas B2B.
     Encontre EXATAMENTE ${quantity} empresas reais e ativas no setor de "${sector}" localizadas em "${location}".
@@ -575,13 +463,8 @@ export const searchNewLeads = async (
         }
     });
 
-    const json = await response.json();
-    const text = json.text || json.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (text) {
-      const result = JSON.parse(text);
-      memoryCache.set(cacheKey, result);
-      return result;
+    if (response.text) {
+      return JSON.parse(response.text);
     }
     return [];
   } catch (error) {
@@ -590,9 +473,9 @@ export const searchNewLeads = async (
   }
 };
 
-// ... Rest of the functions (enrichDecisionMakers, generateSalesKit, etc.) follow the same pattern.
-// I will implement them all to be safe.
-
+/**
+ * FEATURE 30: Decision Maker Matching (Enrichment)
+ */
 export const enrichDecisionMakers = async (companyName: string): Promise<DecisionMaker[]> => {
   try {
     const prompt = `Identifique cargos prováveis de tomadores de decisão na empresa ${companyName}. 
@@ -614,17 +497,21 @@ export const enrichDecisionMakers = async (companyName: string): Promise<Decisio
           }
         }
     });
-    const json = await response.json();
-    const text = json.text || json.candidates?.[0]?.content?.parts?.[0]?.text;
-    return text ? JSON.parse(text) : [];
+
+    if (response.text) {
+      return JSON.parse(response.text);
+    }
+    return [];
+  } catch (error) {
+    console.error("Enrichment Error:", error);
+    return [];
+  }
 };
 
+/**
+ * FEATURE 23, 25, 32, 33: Full Sales Machine (Cadence, Scripts, Email)
+ */
 export const generateSalesKit = async (companyName: string, sector: string): Promise<SalesKit | null> => {
-  const cacheKey = generateCacheKey('generateSalesKit', companyName, sector);
-  if (memoryCache.has(cacheKey)) {
-    return memoryCache.get(cacheKey);
-  }
-
   try {
     const prompt = `Crie um Kit de Vendas B2B completo para prospectar a empresa ${companyName} (${sector}).
     Língua: Português (Brasil). Tom: Consultivo e Profissional.
@@ -658,19 +545,24 @@ export const generateSalesKit = async (companyName: string, sector: string): Pro
                   subject: { type: Type.STRING },
                   content: { type: Type.STRING }
                 }
+              }
+            },
+            objectionHandling: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  objection: { type: Type.STRING },
+                  response: { type: Type.STRING }
                 }
+              }
             }
-            }
+          }
         }
     });
 
-    const json = await response.json();
-    const text = json.text || json.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (text) {
-      const result = JSON.parse(text);
-      memoryCache.set(cacheKey, result);
-      return result;
+    if (response.text) {
+      return JSON.parse(response.text);
     }
     return null;
   } catch (error) {
@@ -680,11 +572,6 @@ export const generateSalesKit = async (companyName: string, sector: string): Pro
 };
 
 export const analyzeCompetitors = async (companyName: string): Promise<Competitor[]> => {
-  const cacheKey = generateCacheKey('analyzeCompetitors', companyName);
-  if (memoryCache.has(cacheKey)) {
-    return memoryCache.get(cacheKey);
-  }
-
   try {
     const prompt = `Liste 3 concorrentes diretos ou indiretos para ${companyName} no mercado brasileiro e seu ponto forte principal.`;
 
@@ -700,16 +587,12 @@ export const analyzeCompetitors = async (companyName: string): Promise<Competito
               name: { type: Type.STRING },
               strength: { type: Type.STRING }
             }
+          }
         }
     });
 
-    const json = await response.json();
-    const text = json.text || json.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (text) {
-      const result = JSON.parse(text);
-      memoryCache.set(cacheKey, result);
-      return result;
+    if (response.text) {
+      return JSON.parse(response.text);
     }
     return [];
   } catch (error) {

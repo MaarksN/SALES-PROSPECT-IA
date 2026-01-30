@@ -1,8 +1,6 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { io } from 'socket.io-client';
 import { Icons } from './constants';
 // Lazy loaded components for performance
 const Dashboard = React.lazy(() => import('./components/Dashboard'));
@@ -14,11 +12,9 @@ const BirthubEngine = React.lazy(() => import('./components/BirthubEngine'));
 const ChatBot = React.lazy(() => import('./components/ChatBot'));
 const Login = React.lazy(() => import('./components/Login'));
 const InternalToolsDashboard = React.lazy(() => import('./components/InternalToolsDashboard'));
+const OnboardingWizard = React.lazy(() => import('./components/OnboardingWizard'));
 
 import LeadModal from './components/LeadModal';
-import CommandPalette from './components/CommandPalette';
-import Onboarding from './components/Onboarding';
-import SidebarClock from './components/SidebarClock';
 import { Lead } from './types';
 import { useStore } from './store/useStore'; // ZUSTAND
 import { Toaster, toast } from 'react-hot-toast';
@@ -39,8 +35,6 @@ const NotFound: React.FC<{ onReset: () => void }> = ({ onReset }) => (
     </div>
 );
 
-const queryClient = new QueryClient();
-
 const App: React.FC = () => {
   // Global State
   const { 
@@ -49,8 +43,7 @@ const App: React.FC = () => {
     updateLead, 
     fetchLeads, 
     addLead,
-    logout,
-    zenMode
+    logout
   } = useStore();
 
   // Router Hooks
@@ -62,20 +55,16 @@ const App: React.FC = () => {
 
   const [darkMode, setDarkMode] = useLocalStorage<boolean>('theme_dark', false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [currentTime, setCurrentTime] = useState(new Date());
   
   // UX States
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useLocalStorage('show_onboarding', true);
 
-  // Initial Fetch & Real-time
+  // Initial Fetch
   useEffect(() => {
     fetchLeads();
-
-    // Connect to WebSocket (BFF)
-    const socket = io({ path: '/socket.io' });
-    socket.on('connect', () => console.log('Collaboration active'));
-
-    return () => { socket.disconnect(); };
   }, []);
 
   // #42 Dark Mode Implementation
@@ -86,6 +75,12 @@ const App: React.FC = () => {
       document.documentElement.classList.remove('dark');
     }
   }, [darkMode]);
+
+  // Real-time Clock
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // DYNAMIC FAVICON
   useEffect(() => {
@@ -156,7 +151,6 @@ const App: React.FC = () => {
   }
 
   return (
-    <QueryClientProvider client={queryClient}>
     <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-[#05050A] font-sans selection:bg-purple-500 selection:text-white transition-colors duration-500">
       
       <Toaster position="top-right" toastOptions={{ className: 'dark:bg-slate-800 dark:text-white' }} />
@@ -185,7 +179,7 @@ const App: React.FC = () => {
       )}
 
       {/* Sidebar */}
-      <aside className={`${sidebarCollapsed ? 'w-24' : 'w-80'} bg-white dark:bg-[#0B1120] border-r border-slate-200 dark:border-white/5 ${zenMode ? 'hidden' : 'hidden md:flex'} flex-col shadow-2xl z-20 relative transition-all duration-500`}>
+      <aside className={`${sidebarCollapsed ? 'w-24' : 'w-80'} bg-white dark:bg-[#0B1120] border-r border-slate-200 dark:border-white/5 hidden md:flex flex-col shadow-2xl z-20 relative transition-all duration-500`}>
         <button 
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
             className="absolute -right-3 top-10 w-6 h-6 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-full flex items-center justify-center text-slate-500 z-50 shadow-sm hover:scale-110 transition-transform"
@@ -216,7 +210,9 @@ const App: React.FC = () => {
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Sistema Online</p>
                         <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse shadow-[0_0_10px_#22c55e]"></div>
                     </div>
-                    <SidebarClock />
+                    <p className="text-3xl font-black text-slate-700 dark:text-white tabular-nums tracking-tight">
+                        {currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                    </p>
                     <div className="mt-2 flex items-center gap-2">
                         <div className="w-6 h-6 rounded-full bg-indigo-500 flex items-center justify-center text-white text-xs font-bold">
                             {user.name.charAt(0).toUpperCase()}
@@ -234,7 +230,6 @@ const App: React.FC = () => {
                     { id: 'tools', icon: <Icons.Sparkles />, label: '100 Power Tools' },
                     { id: 'ailab', icon: <Icons.Lab />, label: 'Laboratório IA' },
                     { id: 'validation', icon: <Icons.Check />, label: 'Validação' },
-                    { id: 'business', icon: <Icons.Briefcase />, label: 'Business Center' },
                 ].map((item) => (
                     <button 
                         key={item.id}
@@ -282,13 +277,11 @@ const App: React.FC = () => {
          
         <div className="p-6 md:p-10 max-w-[1800px] mx-auto relative z-10">
           
-          {!zenMode && (
           <div className="mb-6 flex items-center gap-2 text-sm text-slate-400 font-medium animate-in fade-in slide-in-from-left">
               <span className="hover:text-purple-500 cursor-pointer" onClick={() => handleNavigate('dashboard')}>Home</span>
               <span>/</span>
               <span className="text-slate-600 dark:text-white capitalize">{currentPath === 'ailab' ? 'Laboratório IA' : currentPath === 'tools' ? 'Ferramentas de Vendas' : currentPath === 'birthub' ? 'Birthub AI v2.1' : currentPath}</span>
           </div>
-          )}
 
           <Suspense fallback={
             <div className="flex items-center justify-center h-[50vh] animate-in fade-in">
@@ -323,9 +316,6 @@ const App: React.FC = () => {
           <ChatBot />
       </Suspense>
 
-      <CommandPalette />
-      <Onboarding />
-
       {/* Modal */}
       {selectedLead && (
         <LeadModal 
@@ -335,8 +325,14 @@ const App: React.FC = () => {
         />
       )}
 
+      {/* Onboarding */}
+      {showOnboarding && (
+          <Suspense fallback={null}>
+              <OnboardingWizard onComplete={() => setShowOnboarding(false)} />
+          </Suspense>
+      )}
+
     </div>
-    </QueryClientProvider>
   );
 };
 

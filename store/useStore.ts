@@ -26,12 +26,6 @@ interface AppState {
     // UI State
     activeView: 'dashboard' | 'leads' | 'validation' | 'ailab' | 'tools' | 'birthub';
     setActiveView: (view: any) => void;
-
-    // Navigation & Tool State
-    activeToolId: string | null;
-    setActiveToolId: (id: string | null) => void;
-    zenMode: boolean;
-    setZenMode: (mode: boolean) => void;
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -41,12 +35,8 @@ export const useStore = create<AppState>((set, get) => ({
     credits: 50, // Default Free Plan
     subscription: null,
     activeView: 'dashboard',
-    activeToolId: null,
-    zenMode: false,
 
     setActiveView: (view) => set({ activeView: view }),
-    setActiveToolId: (id) => set({ activeToolId: id }),
-    setZenMode: (mode) => set({ zenMode: mode }),
 
     decrementCredits: (amount = 1) => {
         const current = get().credits;

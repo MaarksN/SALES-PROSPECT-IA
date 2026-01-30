@@ -1,6 +1,5 @@
 
 import { AIToolConfig } from '../types';
-import { EXTRA_TOOLS } from './extra_tools';
 
 export const TOOLS_REGISTRY: AIToolConfig[] = [
   // --- CATEGORIA 1: GERAÇÃO E INTELIGÊNCIA ---
@@ -913,6 +912,5 @@ export const TOOLS_REGISTRY: AIToolConfig[] = [
     Se o lead disser 'Não tenho interesse', como o vendedor faz a pergunta de descoberta? 
     Crie uma árvore de decisão de 3 níveis para esta chamada específica.`,
     outputSchema: { decision_tree: "object", opener: "string", objection_handlers: "array" }
-  },
-  ...EXTRA_TOOLS
+  }
 ];
