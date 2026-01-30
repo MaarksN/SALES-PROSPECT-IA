@@ -1,6 +1,6 @@
 
 import { create } from 'zustand';
-import { Lead, DashboardStats, UserContext } from '../types';
+import { Lead, DashboardStats, UserContext, Subscription } from '../types';
 import { leadService } from '../services/leadService';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
@@ -11,9 +11,11 @@ interface AppState {
     isLoading: boolean;
     user: { email: string; name: string } | null; 
     credits: number; // SaaS Monetization
-    
+    subscription: Subscription | null;
+
     // Actions
     fetchLeads: () => Promise<void>;
+    fetchSubscription: () => Promise<void>;
     addLead: (lead: Lead) => Promise<void>;
     updateLead: (lead: Lead) => Promise<void>;
     login: (email: string) => Promise<void>;
@@ -37,6 +39,7 @@ export const useStore = create<AppState>((set, get) => ({
     isLoading: false,
     user: null, 
     credits: 50, // Default Free Plan
+    subscription: null,
     activeView: 'dashboard',
     activeToolId: null,
     zenMode: false,
@@ -60,16 +63,36 @@ export const useStore = create<AppState>((set, get) => ({
         if (session?.user) {
             set({ user: { email: session.user.email!, name: session.user.email!.split('@')[0] } });
             get().fetchLeads();
+            get().fetchSubscription();
         }
 
         // Setup Listener
         supabase.auth.onAuthStateChange((_event, session) => {
              if (session?.user) {
                  set({ user: { email: session.user.email!, name: session.user.email!.split('@')[0] } });
+                 get().fetchSubscription();
              } else {
-                 set({ user: null, leads: [] });
+                 set({ user: null, leads: [], subscription: null });
              }
         });
+    },
+
+    fetchSubscription: async () => {
+        try {
+            const { data, error } = await supabase
+                .from('subscriptions')
+                .select('*')
+                .single();
+
+            if (data) {
+                set({ subscription: data as Subscription });
+                // Update credits based on plan if needed
+                if (data.plan === 'pro') set({ credits: 500 });
+                if (data.plan === 'enterprise') set({ credits: 9999 });
+            }
+        } catch (error) {
+            console.log("No subscription found or error", error);
+        }
     },
 
     login: async (email: string) => {

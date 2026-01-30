@@ -1,6 +1,14 @@
 
-import { Type, Schema } from "@google/genai";
+import { Type, GenerateContentResponse, Schema } from "@google/genai";
 import { Lead, SalesKit, Competitor, DecisionMaker, AIToolConfig, UserContext, BirthubDossier, BirthubAnalysisResult, GroundingSource } from '../types';
+import { supabase } from '../lib/supabase';
+
+/**
+ * SECURITY UPDATE:
+ * BFF (Backend-for-Frontend) Pattern Implemented.
+ * API Key is now secure on the server.
+ * Frontend calls /api/generate which proxies to Google GenAI.
+ */
 
 // Using stable model version
 const modelName = 'gemini-1.5-flash';
@@ -19,45 +27,83 @@ interface GenerateConfig {
     [key: string]: any;
 }
 
-// Simple in-memory LRU cache
-class SimpleLRUCache {
-  private cache = new Map<string, any>();
-  private readonly maxSize: number;
+const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
-  constructor(maxSize: number = 50) {
-    this.maxSize = maxSize;
-  }
-
-  get(key: string): any {
-    if (!this.cache.has(key)) return undefined;
-    const value = this.cache.get(key);
-    this.cache.delete(key);
-    this.cache.set(key, value);
-    return JSON.parse(JSON.stringify(value));
-  }
-
-  set(key: string, value: any): void {
-    if (this.cache.has(key)) {
-      this.cache.delete(key);
-    } else if (this.cache.size >= this.maxSize) {
-      const firstKey = this.cache.keys().next().value;
-      if (firstKey) this.cache.delete(firstKey);
+async function fetchWithBackoff(fn: () => Promise<any>, retries = 3, wait = 1000): Promise<any> {
+  try {
+    return await fn();
+  } catch (error: any) {
+    if (retries > 0 && (error.status === 429 || error.message?.includes('429'))) {
+      console.warn(`Rate limited. Retrying in ${wait}ms...`);
+      await delay(wait);
+      return fetchWithBackoff(fn, retries - 1, wait * 2);
     }
-    this.cache.set(key, value);
-  }
-
-  has(key: string): boolean {
-    return this.cache.has(key);
+    throw error;
   }
 }
 
-const memoryCache = new SimpleLRUCache(50);
+/**
+ * Helper to call the BFF endpoint.
+ * Replaces direct GoogleGenAI SDK usage on the client.
+ */
+const callGeminiAPI = async (model: string, contents: any, config?: GenerateConfig): Promise<any> => {
+    return fetchWithBackoff(async () => {
+        try {
+            // 1. Get Session Token for Security
+            const { data: { session } } = await supabase.auth.getSession();
 
-const generateCacheKey = (prefix: string, ...args: any[]) => {
-  return `${prefix}:${JSON.stringify(args)}`;
+            const headers: Record<string, string> = {
+                'Content-Type': 'application/json',
+            };
+
+            if (session?.access_token) {
+                headers['Authorization'] = `Bearer ${session.access_token}`;
+            }
+
+            const response = await fetch('/api/generate', {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify({
+                    model,
+                    contents,
+                    config
+                })
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                // Pass status code in error message for backoff detection
+                throw new Error(`API Error (${response.status}): ${errorText}`);
+            }
+
+            const data = await response.json();
+
+            // Compatibility shim: Add .text property if missing, extracting from candidates
+            if (data && !('text' in data)) {
+                let textVal = null;
+                if (data.candidates && data.candidates.length > 0) {
+                    const candidate = data.candidates[0];
+                    if (candidate.content && candidate.content.parts) {
+                        textVal = candidate.content.parts.map((p: any) => p.text || '').join('');
+                    }
+                }
+                // Return a new object with the text property
+                return { ...data, text: textVal };
+            }
+
+            return data;
+        } catch (error) {
+            console.error("BFF Call Failed:", error);
+            throw error;
+        }
+    });
 };
 
-const convertToGeminiSchema = (simpleSchema: Record<string, string>): Schema => {
+
+/**
+ * Helper to convert simplified schema to Gemini API Schema
+ */
+export const convertToGeminiSchema = (simpleSchema: Record<string, string>): Schema => {
   const properties: Record<string, Schema> = {};
   
   Object.entries(simpleSchema).forEach(([key, value]) => {
@@ -135,6 +181,7 @@ export const executeAITool = async (
       IMPORTANTE: Adapte a resposta para refletir este contexto e tom de voz.`;
     }
 
+    // 3. Configuração da Chamada
     const generateConfig: GenerateConfig = {
       temperature: 0.7,
     };
@@ -144,25 +191,15 @@ export const executeAITool = async (
       generateConfig.responseSchema = convertToGeminiSchema(simpleSchema);
     }
 
-    // Determine endpoint based on whether we need streaming
-    const endpoint = onChunk && !simpleSchema ? '/api/generate/stream' : '/api/generate';
+    // 4. Chamada à API via BFF
+    const contents = [
+        { 
+            role: 'user', 
+            parts: [{ text: `SYSTEM ROLE: ${enrichedSystemRole}\n\n--- TAREFA ---\n${finalPrompt}` }] 
+        }
+    ];
 
-    // Note: Streaming with JSON Schema is tricky, so we force non-stream for schema for now to ensure validity
-
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: modelName,
-        contents: [
-          {
-              role: 'user',
-              parts: [{ text: `SYSTEM ROLE: ${enrichedSystemRole}\n\n--- TAREFA ---\n${finalPrompt}` }]
-          }
-        ],
-        config: generateConfig
-      })
-    });
+    const response = await callGeminiAPI(modelName, contents, generateConfig);
 
     if (!response.ok) {
         throw new Error(`API Error: ${response.statusText}`);
@@ -231,20 +268,97 @@ export const executeBirthubEngine = async (target: string): Promise<BirthubAnaly
 
   try {
     const systemPrompt = `Você é o Birthub AI v2.1, o Agente de Prospecção Comercial B2B autônomo.
-    ... (SYSTEM PROMPT IDENTICAL TO ORIGINAL) ...
-    SAÍDA: Dossier JSON.`;
 
-    const response = await fetch('/api/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: modelName,
-        contents: `TARGET PARA ANÁLISE PROFUNDA: ${target}`,
-        config: {
-            systemInstruction: systemPrompt,
-            tools: [{ googleSearch: {} }],
-            responseMimeType: "application/json",
-            responseSchema: {
+    MISSÃO:
+    Identificar, analisar, priorizar e ativar potenciais leads de forma automática, utilizando inteligência artificial, dados públicos e sinais de intenção de compra.
+
+    IDENTIDADE FUNCIONAL:
+    Você opera como um time completo composto por:
+    1. Investigador corporativo (Coleta de dados públicos)
+    2. Especialista em Enrichment (Validação de e-mails, cargos e stack)
+    3. Analista de RevOps (Scoring preditivo e qualificação)
+    4. Copywriter Enterprise (Criação de abordagem personalizada)
+
+    DIRETRIZES DE "ZERO ALUCINAÇÃO":
+    - Todo dado só pode existir se houver evidência pública verificável (Use a Google Search Tool).
+    - Se a informação (ex: telefone, email exato) não estiver disponível publicamente, retorne NULL.
+    - Nunca invente cargos ou nomes.
+    - Priorize qualidade sobre quantidade.
+
+    CRITÉRIOS DE SCORING (0-100):
+    - < 75 (REJECTED): Lead frio, sem fit ou sem dados suficientes.
+    - 75-84 (REVIEW_NEEDED): Lead morno, fit parcial ou dados incertos.
+    - > 85 (APPROVED): ICP Ideal, sinais de compra claros (vagas, notícias, tecnologia compatível).
+
+    SAÍDA:
+    Gere um dossiê JSON estritamente tipado contendo análise profunda, score detalhado e estratégia de ativação.`;
+
+    const contents = `TARGET PARA ANÁLISE PROFUNDA: ${target}`; // Can be string or object, callGeminiAPI handles basic contents
+    // Ideally convert to object for consistency
+    const contentsObj = { role: 'user', parts: [{ text: contents }] };
+
+    const config: GenerateConfig = {
+        systemInstruction: systemPrompt,
+        tools: [{ googleSearch: {} }],
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            company: {
+              type: Type.OBJECT,
+              properties: {
+                legal_name: { type: Type.STRING, nullable: true },
+                trade_name: { type: Type.STRING, nullable: true },
+                cnpj: { type: Type.STRING, nullable: true },
+                industry: { type: Type.STRING, nullable: true },
+                business_model: { type: Type.STRING, enum: ['B2B', 'B2C', 'Marketplace'], nullable: true },
+                maturity_level: { type: Type.STRING, enum: ['Early', 'Growth', 'Enterprise'], nullable: true },
+                employee_range: { type: Type.STRING, nullable: true },
+                website: { type: Type.STRING, nullable: true },
+                linkedin_company: { type: Type.STRING, nullable: true },
+                phone: { type: Type.STRING, nullable: true },
+                email: { type: Type.STRING, nullable: true },
+                address: { type: Type.STRING, nullable: true },
+              }
+            },
+            digital_presence: {
+              type: Type.OBJECT,
+              properties: {
+                website_active: { type: Type.BOOLEAN },
+                linkedin_active: { type: Type.BOOLEAN },
+                other_channels: { type: Type.ARRAY, items: { type: Type.STRING } }
+              }
+            },
+            decision_maker: {
+              type: Type.OBJECT,
+              properties: {
+                name: { type: Type.STRING, nullable: true },
+                role: { type: Type.STRING, nullable: true },
+                linkedin_profile: { type: Type.STRING, nullable: true },
+                email: { type: Type.STRING, nullable: true },
+                phone: { type: Type.STRING, nullable: true },
+                whatsapp: { type: Type.STRING, nullable: true }
+              }
+            },
+            technology: {
+              type: Type.OBJECT,
+              properties: {
+                detected_stack: { type: Type.ARRAY, items: { type: Type.STRING } },
+                crm: { type: Type.STRING, nullable: true },
+                marketing_tools: { type: Type.ARRAY, items: { type: Type.STRING } },
+                sales_tools: { type: Type.ARRAY, items: { type: Type.STRING } }
+              }
+            },
+            signals: {
+              type: Type.OBJECT,
+              properties: {
+                hiring_sales: { type: Type.BOOLEAN },
+                hiring_marketing: { type: Type.BOOLEAN },
+                recent_funding: { type: Type.BOOLEAN },
+                expansion_signals: { type: Type.ARRAY, items: { type: Type.STRING } }
+              }
+            },
+            scoring: {
               type: Type.OBJECT,
               properties: {
                 company: {
@@ -335,8 +449,9 @@ export const executeBirthubEngine = async (target: string): Promise<BirthubAnaly
               }
             }
         }
-      })
-    });
+    };
+
+    const response = await callGeminiAPI(modelName, [contentsObj], config);
 
     const jsonResponse = await response.json();
     const text = jsonResponse.text || jsonResponse.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -379,24 +494,16 @@ export const sendChatMessage = async (
       systemInstruction += `\n\nContexto: Você trabalha para a empresa ${userContext.myCompany}, vendendo ${userContext.myProduct}. Use um tom ${userContext.toneOfVoice}.`;
     }
 
-    const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            model: modelName,
-            history: history.map(h => ({
-                role: h.role,
-                parts: [{ text: h.text }]
-            })),
-            message: newMessage,
-            config: {
-                systemInstruction: systemInstruction
-            }
-        })
-    });
+    // Construct full history for stateless call
+    const contents = history.map(h => ({
+        role: h.role,
+        parts: [{ text: h.text }]
+    }));
+    // Add new message
+    contents.push({ role: 'user', parts: [{ text: newMessage }] });
 
-    const result = await response.json();
-    return result.text;
+    const response = await callGeminiAPI(modelName, contents, { systemInstruction });
+    return response.text;
   } catch (error) {
     console.error("Chat Error:", error);
     throw error;
@@ -442,36 +549,30 @@ export const searchNewLeads = async (
     
     Use a ferramenta de busca para garantir dados reais.`;
 
-    const response = await fetch('/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            model: modelName,
-            contents: prompt,
-            config: {
-                tools: [{ googleSearch: {} }],
-                responseMimeType: "application/json",
-                responseSchema: {
-                  type: Type.ARRAY,
-                  items: {
-                    type: Type.OBJECT,
-                    properties: {
-                      companyName: { type: Type.STRING },
-                      location: { type: Type.STRING },
-                      sector: { type: Type.STRING },
-                      website: { type: Type.STRING },
-                      phone: { type: Type.STRING },
-                      score: { type: Type.NUMBER },
-                      techStack: { type: Type.ARRAY, items: { type: Type.STRING } },
-                      tags: { type: Type.ARRAY, items: { type: Type.STRING } },
-                      revenueEstimate: { type: Type.STRING },
-                      matchReason: { type: Type.STRING, description: "Motivo estratégico da escolha" }
-                    },
-                    required: ["companyName", "location", "score", "matchReason"]
-                  }
-                }
-            }
-        })
+    const contents = [{ role: 'user', parts: [{ text: prompt }] }];
+
+    const response = await callGeminiAPI(modelName, contents, {
+        tools: [{ googleSearch: {} }],
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              companyName: { type: Type.STRING },
+              location: { type: Type.STRING },
+              sector: { type: Type.STRING },
+              website: { type: Type.STRING },
+              phone: { type: Type.STRING },
+              score: { type: Type.NUMBER },
+              techStack: { type: Type.ARRAY, items: { type: Type.STRING } },
+              tags: { type: Type.ARRAY, items: { type: Type.STRING } },
+              revenueEstimate: { type: Type.STRING },
+              matchReason: { type: Type.STRING, description: "Motivo estratégico da escolha" }
+            },
+            required: ["companyName", "location", "score", "matchReason"]
+          }
+        }
     });
 
     const json = await response.json();
@@ -493,28 +594,25 @@ export const searchNewLeads = async (
 // I will implement them all to be safe.
 
 export const enrichDecisionMakers = async (companyName: string): Promise<DecisionMaker[]> => {
-    // ... similar implementation
-    const response = await fetch('/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            model: modelName,
-            contents: `Identifique cargos prováveis de tomadores de decisão na empresa ${companyName}. Foque em Diretores, Gerentes e C-Level. Retorne 3 personas.`,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.ARRAY,
-                    items: {
-                        type: Type.OBJECT,
-                        properties: {
-                            name: { type: Type.STRING },
-                            role: { type: Type.STRING },
-                            linkedin: { type: Type.STRING }
-                        }
-                    }
-                }
+  try {
+    const prompt = `Identifique cargos prováveis de tomadores de decisão na empresa ${companyName}. 
+    Foque em Diretores, Gerentes e C-Level. Retorne 3 personas.`;
+
+    const contents = [{ role: 'user', parts: [{ text: prompt }] }];
+
+    const response = await callGeminiAPI(modelName, contents, {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              name: { type: Type.STRING },
+              role: { type: Type.STRING },
+              linkedin: { type: Type.STRING }
             }
-        })
+          }
+        }
     });
     const json = await response.json();
     const text = json.text || json.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -539,47 +637,31 @@ export const generateSalesKit = async (companyName: string, sector: string): Pro
     5. Cadência de Prospecção de 3 passos (Dia 1, Dia 3, Dia 7) misturando canais.
     6. Duas objeções comuns e como contornar.`;
 
-    const response = await fetch('/api/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: modelName,
-        contents: prompt,
-        config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-                valueProposition: { type: Type.STRING },
-                emailSubject: { type: Type.STRING },
-                emailBody: { type: Type.STRING },
-                phoneScript: { type: Type.STRING },
-                cadence: {
-                type: Type.ARRAY,
-                items: {
-                    type: Type.OBJECT,
-                    properties: {
-                    day: { type: Type.NUMBER },
-                    channel: { type: Type.STRING, enum: ["email", "linkedin", "phone"] },
-                    subject: { type: Type.STRING },
-                    content: { type: Type.STRING }
-                    }
-                }
-                },
-                objectionHandling: {
-                type: Type.ARRAY,
-                items: {
-                    type: Type.OBJECT,
-                    properties: {
-                    objection: { type: Type.STRING },
-                    response: { type: Type.STRING }
-                    }
+    const contents = [{ role: 'user', parts: [{ text: prompt }] }];
+
+    const response = await callGeminiAPI(modelName, contents, {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            valueProposition: { type: Type.STRING },
+            emailSubject: { type: Type.STRING },
+            emailBody: { type: Type.STRING },
+            phoneScript: { type: Type.STRING },
+            cadence: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  day: { type: Type.NUMBER },
+                  channel: { type: Type.STRING, enum: ["email", "linkedin", "phone"] },
+                  subject: { type: Type.STRING },
+                  content: { type: Type.STRING }
                 }
                 }
             }
             }
         }
-      })
     });
 
     const json = await response.json();
@@ -606,26 +688,19 @@ export const analyzeCompetitors = async (companyName: string): Promise<Competito
   try {
     const prompt = `Liste 3 concorrentes diretos ou indiretos para ${companyName} no mercado brasileiro e seu ponto forte principal.`;
 
-    const response = await fetch('/api/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: modelName,
-        contents: prompt,
-        config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-            type: Type.ARRAY,
-            items: {
-                type: Type.OBJECT,
-                properties: {
-                name: { type: Type.STRING },
-                strength: { type: Type.STRING }
-                }
-            }
+    const contents = [{ role: 'user', parts: [{ text: prompt }] }];
+
+    const response = await callGeminiAPI(modelName, contents, {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              name: { type: Type.STRING },
+              strength: { type: Type.STRING }
             }
         }
-      })
     });
 
     const json = await response.json();
@@ -644,26 +719,90 @@ export const analyzeCompetitors = async (companyName: string): Promise<Competito
 };
 
 export const checkLocationData = async (companyName: string, city: string) => {
-    try {
-        const response = await fetch('/api/generate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                model: modelName,
-                contents: `Find the exact address, rating and recent reviews for ${companyName} in ${city}.`,
-                config: {
-                    tools: [{ googleMaps: {} }],
-                }
-            })
-        });
-        const json = await response.json();
-        return json.text || json.candidates?.[0]?.content?.parts?.[0]?.text || "Erro ao buscar local.";
-    } catch (e) { return "Erro na API"; }
+  try {
+    const contents = [{ role: 'user', parts: [{ text: `Find the exact address, rating and recent reviews for ${companyName} in ${city}.` }] }];
+    const response = await callGeminiAPI("gemini-1.5-flash", contents, {
+        tools: [{ googleMaps: {} }],
+    });
+    return response.text;
+  } catch (error) {
+    console.error("Maps Error:", error);
+    return "Não foi possível validar a localização.";
+  }
 };
 
-export const generateMarketingImage = async () => null;
-export const generateVideoAsset = async () => null;
-export const generateSpeech = async () => null;
-export const deepReasoning = async () => "Not implemented in BFF yet.";
-export const transcribeAudio = async () => "Not implemented in BFF yet.";
-export const analyzeVisualContent = async () => "Not implemented in BFF yet.";
+export const generateMarketingImage = async (prompt: string, size: "1K" | "2K" | "4K" = "1K", aspectRatio: string = "1:1") => {
+  try {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      const response = await fetch('/api/generate-image', {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+              ...(session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : {})
+          },
+          body: JSON.stringify({ prompt, size, aspectRatio })
+      });
+
+      if (!response.ok) throw new Error("Image gen failed");
+      const data = await response.json();
+      return data.images?.[0]?.url || null;
+  } catch (error) {
+      console.error("Image Gen Error:", error);
+      return null;
+  }
+};
+
+export const generateVideoAsset = async (prompt: string, aspectRatio: '16:9' | '9:16' = '16:9') => {
+  console.warn("Video Generation disabled: Requires Veo model which is currently in restricted preview.");
+  return null;
+};
+
+export const generateSpeech = async (text: string) => {
+  console.warn("TTS disabled: Requires Vertex AI or specialized model.");
+  return null;
+};
+
+export const deepReasoning = async (query: string) => {
+  try {
+    const contents = [{ role: 'user', parts: [{ text: query }] }];
+    const response = await callGeminiAPI("gemini-1.5-pro", contents);
+    return response.text;
+  } catch (error) {
+    console.error("Thinking Error:", error);
+    return "Erro no raciocínio profundo.";
+  }
+};
+
+export const transcribeAudio = async (base64Audio: string, mimeType: string) => {
+  try {
+    const contents = {
+        parts: [
+          { inlineData: { mimeType, data: base64Audio } },
+          { text: "Transcribe this audio precisely." }
+        ]
+      };
+
+    const response = await callGeminiAPI(modelName, contents);
+    return response.text;
+  } catch (error) {
+    console.error("Transcription Error:", error);
+    return "Erro na transcrição.";
+  }
+};
+
+export const analyzeVisualContent = async (base64Data: string, mimeType: string, prompt: string) => {
+    try {
+        const contents = {
+                parts: [
+                    { inlineData: { mimeType, data: base64Data } },
+                    { text: prompt }
+                ]
+            };
+        const response = await callGeminiAPI('gemini-1.5-pro', contents);
+        return response.text;
+    } catch (error) {
+        console.error("Visual Analysis Error:", error);
+        return "Erro na análise visual.";
+    }
+}

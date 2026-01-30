@@ -8,9 +8,14 @@ const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [agreed, setAgreed] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!agreed) {
+        alert("Você precisa aceitar os termos de uso.");
+        return;
+    }
     setLoading(true);
     // Simulating Auth Delay
     await new Promise(resolve => setTimeout(resolve, 1000));
@@ -57,9 +62,22 @@ const Login: React.FC = () => {
                     />
                 </div>
 
+                <div className="flex items-center gap-2">
+                    <input
+                        type="checkbox"
+                        id="terms"
+                        checked={agreed}
+                        onChange={e => setAgreed(e.target.checked)}
+                        className="w-4 h-4 rounded border-white/20 bg-white/5 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <label htmlFor="terms" className="text-sm text-slate-400">
+                        Li e concordo com a <a href="#" className="text-indigo-400 hover:text-indigo-300">Política de Privacidade</a> e <a href="#" className="text-indigo-400 hover:text-indigo-300">Termos de Uso</a>.
+                    </label>
+                </div>
+
                 <button 
                     type="submit" 
-                    disabled={loading}
+                    disabled={loading || !agreed}
                     className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold py-4 rounded-xl shadow-lg hover:shadow-indigo-500/25 hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2"
                 >
                     {loading ? <Icons.Refresh className="animate-spin" /> : 'Entrar no Sistema'}

@@ -1,10 +1,18 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+// @ts-ignore
+import { FixedSizeList as List } from 'react-window';
+// @ts-ignore
+import AutoSizer from 'react-virtualized-auto-sizer';
 import { Lead } from '../types';
 import { Icons } from '../constants';
 import { searchNewLeads } from '../services/geminiService';
+import { crmService } from '../services/crmService';
 import { Skeleton } from './Skeleton';
 import { useStore } from '../store/useStore'; // Zustand
+import { toast } from 'react-hot-toast';
+import { LeadCard } from './LeadCard';
+import Button from './ui/Button';
 
 interface LeadListProps {
   leads: Lead[];
@@ -218,6 +226,28 @@ const LeadList: React.FC<LeadListProps> = ({ leads, onSelect, onAddLeads }) => {
     document.body.removeChild(link);
   }
 
+  const handleWhatsApp = (lead: Lead) => {
+      if (!lead.phone) {
+          toast.error("Lead sem telefone!");
+          return;
+      }
+      // Clean phone
+      const phone = lead.phone.replace(/\D/g, '');
+      const message = encodeURIComponent(`Olá, vi que a ${lead.companyName} é referência em ${lead.sector}. Gostaria de conversar sobre parcerias.`);
+      window.open(`https://web.whatsapp.com/send?phone=55${phone}&text=${message}`, '_blank');
+  };
+
+  const handleCRMExport = async (lead: Lead) => {
+      toast.promise(
+          crmService.exportToHubSpot(lead),
+          {
+              loading: 'Exportando para HubSpot...',
+              success: 'Exportado com sucesso!',
+              error: 'Erro na exportação'
+          }
+      );
+  };
+
   const columns = {
       new: filteredLeads.filter(l => l.status === 'new'),
       qualifying: filteredLeads.filter(l => l.status === 'qualifying'),
@@ -273,20 +303,22 @@ const LeadList: React.FC<LeadListProps> = ({ leads, onSelect, onAddLeads }) => {
                  </button>
              </div>
 
-             <button 
+             <Button
                 onClick={() => fileInputRef.current?.click()}
-                className="px-6 py-4 rounded-[2rem] font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 hover:bg-slate-50 transition-all flex items-center gap-2"
+                variant="secondary"
+                className="rounded-[2rem]"
                 title="Importar CSV"
              >
                 <Icons.Upload /> Importar
-             </button>
-             <button 
+             </Button>
+             <Button
                 onClick={exportCSV}
-                className="px-6 py-4 rounded-[2rem] font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 hover:bg-slate-50 transition-all flex items-center gap-2"
+                variant="secondary"
+                className="rounded-[2rem]"
                 title="Exportar para CSV"
              >
                 <Icons.Check /> Exportar
-             </button>
+             </Button>
              <button 
                 onClick={() => setShowAISearch(!showAISearch)}
                 className={`relative px-8 py-4 rounded-[2rem] font-bold text-lg shadow-2xl hover:scale-105 transition-all flex items-center gap-3 overflow-hidden ${showAISearch ? 'bg-slate-200 text-slate-600' : 'bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow-amber-500/30 ring-2 ring-amber-400/50'}`}
@@ -390,83 +422,32 @@ const LeadList: React.FC<LeadListProps> = ({ leads, onSelect, onAddLeads }) => {
           </div>
       )}
 
-      {/* LIST VIEW */}
+      {/* LIST VIEW (Virtualized) */}
       {!isSearchingAI && !isLoading && viewMode === 'list' && (
-        <div className="grid grid-cols-1 gap-8">
-            {filteredLeads.map((lead) => (
-            <div 
-                key={lead.id} 
-                className={`group relative bg-white dark:bg-[#0F1629] p-10 rounded-[3rem] border transition-all duration-300 hover:scale-[1.01] ${
-                    lead.score > 80 
-                    ? 'border-amber-400/50 dark:border-amber-500/50 shadow-[0_20px_60px_-15px_rgba(245,158,11,0.15)]' 
-                    : 'border-slate-100 dark:border-white/5 shadow-xl hover:shadow-2xl'
-                }`}
-            >
-                {/* High Score Badge */}
-                {lead.score > 80 && (
-                    <div className="absolute -top-5 right-12 bg-gradient-to-r from-amber-400 to-orange-500 text-white text-xs font-black uppercase tracking-widest px-6 py-3 rounded-full shadow-lg flex items-center gap-2 z-10 ring-4 ring-white dark:ring-[#05050A]">
-                        <Icons.Sparkles /> Oportunidade Ouro
-                    </div>
+        <div className="h-[800px] w-full">
+            {/* @ts-ignore */}
+            <AutoSizer>
+                {({ height, width }: { height: number; width: number }) => (
+                    <List
+                        height={height}
+                        width={width}
+                        itemCount={filteredLeads.length}
+                        itemSize={250}
+                    >
+                        {({ index, style }: { index: number; style: React.CSSProperties }) => (
+                            <LeadCard
+                                lead={filteredLeads[index]}
+                                style={style}
+                                onSelect={onSelect}
+                                onWhatsApp={handleWhatsApp}
+                                onCRMExport={handleCRMExport}
+                                openGoogleMaps={openGoogleMaps}
+                                stringToColor={stringToColor}
+                            />
+                        )}
+                    </List>
                 )}
-
-                <div className="flex flex-col md:flex-row justify-between gap-10">
-                    {/* Left: Avatar & Info */}
-                    <div className="flex gap-8 items-start flex-1">
-                        <div 
-                            className="w-24 h-24 rounded-[2rem] flex items-center justify-center text-4xl font-black text-white shadow-2xl"
-                            style={{ backgroundColor: stringToColor(lead.companyName) }}
-                        >
-                            {lead.companyName.charAt(0)}
-                        </div>
-                        
-                        <div className="space-y-3">
-                            <h3 className="text-3xl font-bold dark:text-white group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-purple-500 group-hover:to-pink-500 transition-all">
-                                {lead.companyName}
-                            </h3>
-                            <div className="flex flex-wrap gap-3 text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-                                <span className="flex items-center gap-2 bg-slate-100 dark:bg-white/5 px-4 py-2 rounded-xl border border-slate-200 dark:border-white/5">🏢 {lead.sector}</span>
-                                <span className="flex items-center gap-2 bg-slate-100 dark:bg-white/5 px-4 py-2 rounded-xl border border-slate-200 dark:border-white/5">📍 {lead.location}</span>
-                            </div>
-                            
-                            {(lead as any).matchReason && (
-                                <div className="mt-4 p-5 bg-indigo-50 dark:bg-indigo-500/10 rounded-3xl border border-indigo-100 dark:border-indigo-500/20 max-w-2xl relative">
-                                    <div className="absolute -left-2 top-6 w-0 h-0 border-t-[10px] border-t-transparent border-r-[10px] border-r-indigo-50 dark:border-r-indigo-500/10 border-b-[10px] border-b-transparent"></div>
-                                    <p className="text-base text-indigo-800 dark:text-indigo-300 italic flex gap-3 items-start leading-relaxed">
-                                        <span className="text-2xl">💡</span> "{(lead as any).matchReason}"
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Right: Actions & Score */}
-                    <div className="flex flex-col items-end gap-6 min-w-[200px]">
-                        <div className="text-right p-4 bg-slate-50 dark:bg-white/5 rounded-3xl border border-slate-100 dark:border-white/5 w-full">
-                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">Score IA</p>
-                            <div className="text-5xl font-black bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                                {lead.score}<span className="text-lg text-slate-300 dark:text-slate-600">/100</span>
-                            </div>
-                        </div>
-
-                        <div className="flex gap-4 w-full">
-                            <button 
-                                onClick={() => openGoogleMaps(lead.location || '', lead.companyName)}
-                                className="w-16 h-16 flex items-center justify-center rounded-[1.5rem] bg-slate-100 dark:bg-white/10 text-slate-400 hover:bg-blue-50 hover:text-blue-500 dark:hover:bg-blue-500/20 dark:hover:text-blue-400 transition-colors"
-                                title="Ver no Mapa"
-                            >
-                                <Icons.Search />
-                            </button>
-                            <button 
-                                onClick={() => onSelect(lead)}
-                                className="flex-1 px-8 py-4 rounded-[1.5rem] font-bold text-white bg-[#0B1120] dark:bg-white dark:text-[#0B1120] hover:bg-purple-600 dark:hover:bg-purple-500 dark:hover:text-white transition-all shadow-xl hover:shadow-purple-500/25 flex items-center justify-center gap-3 group/btn"
-                            >
-                                Detalhes <span className="text-xl group-hover/btn:translate-x-1 transition-transform">➔</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            ))}
+            </AutoSizer>
         </div>
       )}
 

@@ -13,7 +13,7 @@ const ToolsHub = React.lazy(() => import('./components/ToolsHub'));
 const BirthubEngine = React.lazy(() => import('./components/BirthubEngine'));
 const ChatBot = React.lazy(() => import('./components/ChatBot'));
 const Login = React.lazy(() => import('./components/Login'));
-const BusinessFeatures = React.lazy(() => import('./components/BusinessFeatures'));
+const InternalToolsDashboard = React.lazy(() => import('./components/InternalToolsDashboard'));
 
 import LeadModal from './components/LeadModal';
 import CommandPalette from './components/CommandPalette';
@@ -310,7 +310,7 @@ const App: React.FC = () => {
                 <Route path="/birthub" element={<BirthubEngine onSaveLead={(lead) => addLead(lead)} />} />
                 <Route path="/ailab" element={<AILab />} />
                 <Route path="/validation" element={<CNPJValidator />} />
-                <Route path="/business" element={<BusinessFeatures />} />
+                <Route path="/internal-tools" element={<InternalToolsDashboard />} />
                 <Route path="*" element={<NotFound onReset={() => navigate('/')} />} />
              </Routes>
           </Suspense>

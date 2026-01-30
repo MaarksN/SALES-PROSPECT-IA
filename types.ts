@@ -42,6 +42,7 @@ export interface ScoringBreakdown {
 
 export interface Lead {
   id: string;
+  userId?: string; // Owner of the lead (for RLS)
   companyName: string;
   cnpj?: string;
   sector?: string;
@@ -94,6 +95,14 @@ export interface DashboardStats {
   qualifiedLeads: number;
   conversionRate: number;
   projectedRevenue: number;
+}
+
+export interface Subscription {
+  id: string;
+  userId: string;
+  status: 'active' | 'canceled' | 'past_due';
+  plan: 'free' | 'pro' | 'enterprise';
+  currentPeriodEnd?: string;
 }
 
 // === NEW TYPES FOR SALES TOOLS & AI ===

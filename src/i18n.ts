@@ -1,24 +1,17 @@
 
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
-
-import translationPT from './locales/pt.json';
-import translationEN from './locales/en.json';
-
-const resources = {
-  en: {
-    translation: translationEN
-  },
-  pt: {
-    translation: translationPT
-  }
-};
+import Backend from 'i18next-http-backend';
 
 i18n
+  .use(Backend) // Loads translations from /public/locales
   .use(initReactI18next)
   .init({
-    resources,
-    lng: "pt", // Default language
+    fallbackLng: 'en',
+    lng: 'pt',
+    backend: {
+      loadPath: '/locales/{{lng}}.json',
+    },
     interpolation: {
       escapeValue: false // react already safes from xss
     }

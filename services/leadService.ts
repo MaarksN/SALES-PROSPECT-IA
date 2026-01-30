@@ -30,10 +30,18 @@ export const leadService = {
 
     async createLead(lead: Lead): Promise<Lead> {
         if (isSupabaseConfigured()) {
+            // Attach User ID for RLS
+            const { data: { user } } = await supabase.auth.getUser();
+            const leadToInsert = { ...lead };
+
+            if (user) {
+                leadToInsert.userId = user.id;
+            }
+
             // Remove ID to let DB generate UUID if needed, or pass it if client-generated
             const { data, error } = await supabase
                 .from('leads')
-                .insert([lead])
+                .insert([leadToInsert])
                 .select()
                 .single();
             
