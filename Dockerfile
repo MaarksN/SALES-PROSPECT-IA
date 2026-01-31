@@ -6,19 +6,9 @@ COPY . .
 RUN npm run build
 
 FROM nginx:alpine
+# Adicionar usuário não-root se necessário para conformidade, mas nginx geralmente roda como nginx ou root no container
+# Para manter simples e funcional no padrão nginx:
 COPY --from=builder /app/dist /usr/share/nginx/html
-RUN echo "server { \
-    listen 80; \
-    root /usr/share/nginx/html; \
-    index index.html; \
-    location / { \
-        try_files \$uri \$uri/ /index.html; \
-    } \
-    location ~* \.(?:ico|css|js|gif|jpe?g|png|woff2?)$ { \
-        expires 6M; \
-        access_log off; \
-        add_header Cache-Control \"public\"; \
-    } \
-}" > /etc/nginx/conf.d/default.conf
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
