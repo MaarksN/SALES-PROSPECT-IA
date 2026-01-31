@@ -6,29 +6,13 @@ module.exports = {
     'plugin:@typescript-eslint/recommended',
     'plugin:react-hooks/recommended',
     'plugin:jsx-a11y/recommended',
-<<<<<<< HEAD
     'plugin:prettier/recommended',
-=======
->>>>>>> main
     'plugin:import/recommended',
     'plugin:import/typescript'
   ],
   ignorePatterns: ['dist', '.eslintrc.cjs'],
   parser: '@typescript-eslint/parser',
-<<<<<<< HEAD
   plugins: ['react-refresh', 'jsx-a11y', 'import'],
-=======
-  parserOptions: {
-    project: './tsconfig.json',
-  },
-  plugins: ['react-refresh', 'jsx-a11y', 'import'],
-  settings: {
-    'import/resolver': {
-      typescript: true,
-      node: true
-    }
-  },
->>>>>>> main
   rules: {
     'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
     '@typescript-eslint/no-explicit-any': 'warn',
@@ -40,27 +24,12 @@ module.exports = {
     'import/no-unresolved': 'error',
     'import/order': [
       'warn',
-<<<<<<< HEAD
       {
         groups: ['builtin', 'external', 'internal', 'parent', 'sibling', 'index'],
         'newlines-between': 'always',
         alphabetize: { order: 'asc', caseInsensitive: true }
       }
     ]
-=======
-      { allowConstantExport: true },
-    ],
-    'no-console': ['warn', { allow: ['warn', 'error'] }],
-    'import/order': [
-      'warn',
-      {
-        groups: ['builtin', 'external', 'internal', 'parent', 'sibling', 'index'],
-        'newlines-between': 'always',
-        alphabetize: { order: 'asc', caseInsensitive: true },
-      },
-    ],
-    '@typescript-eslint/strict-boolean-expressions': 'warn'
->>>>>>> main
   },
   settings: {
     'import/resolver': {
