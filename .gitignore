@@ -10,6 +10,13 @@ node_modules
 dist
 dist-ssr
 *.local
+<<<<<<< HEAD
+=======
+.env
+.env.production
+playwright-report
+test-results
+>>>>>>> main
 
 # Editor
 .vscode/*
@@ -17,6 +24,7 @@ dist-ssr
 .idea
 .DS_Store
 *.sw?
+<<<<<<< HEAD
 thumbs.db
 
 # Variáveis de Ambiente
@@ -34,3 +42,10 @@ blob-report
 # Platform Specific
 .bolt/
 backup/
+=======
+Thumbs.db
+
+# Generated
+.bolt/
+*.test.ts.snap
+>>>>>>> main
