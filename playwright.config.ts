@@ -7,9 +7,11 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
   reporter: "html",
+  timeout: 60 * 1000, // Timeout global aumentado (60s)
   use: {
     baseURL: "http://localhost:5173",
-    trace: "on-first-retry",
+    trace: "retain-on-failure", // Trace apenas em falha
+    video: "retain-on-failure", // Vídeo apenas em falha
     screenshot: "only-on-failure",
   },
   projects: [

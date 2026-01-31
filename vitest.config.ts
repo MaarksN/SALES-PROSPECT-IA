@@ -11,5 +11,11 @@ export default defineConfig({
     setupFiles: ["./src/setupTests.ts"],
     coverage: { reporter: ["text", "json", "html"] },
     include: ["**/*.{test,spec}.{ts,tsx}"],
+    reporters: ["verbose"],
+    globalSetup: ["./test/globalSetup.ts"],
+    alias: {
+      // Mock Service Worker alias if we decide to use it later, prepared as requested
+      // "msw/node": path.resolve(__dirname, "./node_modules/msw/node"),
+    }
   },
 });
