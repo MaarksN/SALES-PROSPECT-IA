@@ -1,43 +1,24 @@
+import { test, expect } from "@playwright/test";
 
-import { test, expect } from '@playwright/test';
+test.describe("Smoke Test - Fluxo Crítico", () => {
+  test("deve carregar a página de login e permitir acesso", async ({ page }) => {
+    // 1. Acessa a Home (Redireciona para Login se não autenticado)
+    await page.goto("/");
 
-test.describe('Critical Flow', () => {
-  test('Login and Dashboard access', async ({ page }) => {
-    // 1. Visit Login Page
-    await page.goto('/');
+    // 2. Verifica elementos de Login
+    await expect(page.getByText("Sales Prospector v2")).toBeVisible();
+    await expect(page.getByPlaceholder("voce@empresa.com")).toBeVisible();
 
-    // 2. Perform Login (Simulated)
-    const emailInput = page.getByPlaceholder('seu@email.com');
-    await expect(emailInput).toBeVisible();
-    await emailInput.fill('test@demo.com');
+    // 3. Simula Login (O componente Login.tsx tem um mock que aceita qualquer coisa)
+    await page.getByPlaceholder("voce@empresa.com").fill("test@user.com");
+    await page.getByPlaceholder("••••••••").fill("123456");
+    await page.getByRole("button", { name: "Acessar Plataforma" }).click();
 
-    const loginButton = page.getByRole('button', { name: /entrar/i });
-    await loginButton.click();
+    // 4. Verifica redirecionamento para Dashboard
+    // Aguarda o toast de sucesso ou a navegação
+    await expect(page.getByText("Visão Geral")).toBeVisible({ timeout: 10000 });
 
-    // 3. Verify Dashboard Access
-    // Wait for the "Dashboard" heading or specific element to appear
-    await expect(page.getByText('Dashboard de Vendas')).toBeVisible();
-
-    // Check if stats are visible
-    await expect(page.getByText('Total de Leads')).toBeVisible();
-  });
-
-  test('Navigate to Lead Generation', async ({ page }) => {
-     // Setup: Login first
-     await page.goto('/');
-     await page.getByPlaceholder('seu@email.com').fill('test@demo.com');
-     await page.getByRole('button', { name: /entrar/i }).click();
-
-     // Navigate to AI Lab or Lead Gen
-     // Assuming there is a sidebar or navigation.
-     // Let's check for "Validar Leads" or similar if explicit "Gerar Lead" isn't in menu.
-     // Based on memory, activeView is 'dashboard' by default.
-     // Sidebar might have "AI Lab".
-
-     const aiLabButton = page.getByText('AI Lab');
-     if (await aiLabButton.isVisible()) {
-         await aiLabButton.click();
-         await expect(page.getByText('Laboratório de Inteligência')).toBeVisible();
-     }
+    // 5. Verifica se os créditos foram carregados
+    await expect(page.getByText("Créditos")).toBeVisible();
   });
 });

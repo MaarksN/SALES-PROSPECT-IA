@@ -1,3 +1,77 @@
+<<<<<<< HEAD
+version: "3.8"
+
+services:
+  # 1. API Backend (Node.js)
+  api:
+    build:
+      context: server
+      dockerfile: ../server.Dockerfile
+    environment:
+      - PORT=3001
+      - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - VITE_GEMINI_API_KEY=${VITE_GEMINI_API_KEY}
+    networks:
+      - prospector-net
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    volumes:
+      - ./server/logs:/app/logs
+
+  # 2. Worker (Fila de Jobs)
+  worker:
+    build:
+      context: server
+      dockerfile: ../server.Dockerfile
+    command: ["node", "worker.js"]
+    environment:
+      - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - VITE_GEMINI_API_KEY=${VITE_GEMINI_API_KEY}
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - prospector-net
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+    volumes:
+      - ./server/logs:/app/logs
+
+  # 3. Frontend (Nginx Server)
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - prospector-net
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+
+networks:
+  prospector-net:
+    driver: bridge
+=======
 version: '3.8'
 
 services:
@@ -50,3 +124,4 @@ services:
 
 volumes:
   db_data:
+>>>>>>> main

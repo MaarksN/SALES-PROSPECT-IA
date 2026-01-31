@@ -1,0 +1,22 @@
+version: "3.8"
+
+services:
+  api:
+    ports:
+      - "127.0.0.1:3001:3001" # Exposto apenas localmente
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - ./server:/app
+      - /app/node_modules
+
+  worker:
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - ./server:/app
+      - /app/node_modules
+
+  web:
+    ports:
+      - "127.0.0.1:8080:80" # Exposto apenas localmente

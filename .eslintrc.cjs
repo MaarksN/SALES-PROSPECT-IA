@@ -1,17 +1,23 @@
-
 module.exports = {
   root: true,
-  env: { browser: true, es2020: true },
+  env: { browser: true, es2020: true, node: true },
   extends: [
     'eslint:recommended',
     'plugin:@typescript-eslint/recommended',
     'plugin:react-hooks/recommended',
     'plugin:jsx-a11y/recommended',
+<<<<<<< HEAD
+    'plugin:prettier/recommended',
+=======
+>>>>>>> main
     'plugin:import/recommended',
     'plugin:import/typescript'
   ],
   ignorePatterns: ['dist', '.eslintrc.cjs'],
   parser: '@typescript-eslint/parser',
+<<<<<<< HEAD
+  plugins: ['react-refresh', 'jsx-a11y', 'import'],
+=======
   parserOptions: {
     project: './tsconfig.json',
   },
@@ -22,9 +28,26 @@ module.exports = {
       node: true
     }
   },
+>>>>>>> main
   rules: {
-    'react-refresh/only-export-components': [
+    'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+    '@typescript-eslint/no-explicit-any': 'warn',
+    '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+    '@typescript-eslint/strict-boolean-expressions': 'off',
+    'jsx-a11y/alt-text': 'error',
+    'react/prop-types': 'off',
+    'no-console': process.env.NODE_ENV === 'production' ? 'error' : 'warn',
+    'import/no-unresolved': 'error',
+    'import/order': [
       'warn',
+<<<<<<< HEAD
+      {
+        groups: ['builtin', 'external', 'internal', 'parent', 'sibling', 'index'],
+        'newlines-between': 'always',
+        alphabetize: { order: 'asc', caseInsensitive: true }
+      }
+    ]
+=======
       { allowConstantExport: true },
     ],
     'no-console': ['warn', { allow: ['warn', 'error'] }],
@@ -37,5 +60,16 @@ module.exports = {
       },
     ],
     '@typescript-eslint/strict-boolean-expressions': 'warn'
+>>>>>>> main
   },
+  settings: {
+    'import/resolver': {
+      typescript: {
+        project: ['./tsconfig.json']
+      },
+      node: {
+        extensions: ['.js', '.jsx', '.ts', '.tsx']
+      }
+    }
+  }
 }

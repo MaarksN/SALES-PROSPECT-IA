@@ -1,6 +1,20 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 const envSchema = z.object({
+<<<<<<< HEAD
+  // Core
+  VITE_SUPABASE_URL: z.string().optional().default("https://placeholder.supabase.co"),
+  VITE_SUPABASE_ANON_KEY: z.string().optional().default("placeholder"),
+  VITE_API_URL: z.string().url().default("http://localhost:3001"),
+
+  // Feature Flags & Tokens
+  VITE_ENABLE_REAL_CRM: z.enum(["true", "false"]).default("false"),
+  VITE_HUBSPOT_TOKEN: z.string().optional(),
+  VITE_CLEARBIT_KEY: z.string().optional(),
+});
+
+export const env = envSchema.parse(import.meta.env);
+=======
   VITE_SUPABASE_URL: z.string().url().optional().or(z.literal('')),
   VITE_SUPABASE_ANON_KEY: z.string().optional().or(z.literal('')),
   GEMINI_API_KEY: z.string().optional(), // Often in .env but not exposed to client in BFF mode
@@ -30,3 +44,4 @@ export const env = _env.success ? _env.data : {
     VITE_APP_NAME: 'Sales Prospector AI',
     SENTRY_DSN: undefined,
 };
+>>>>>>> main
