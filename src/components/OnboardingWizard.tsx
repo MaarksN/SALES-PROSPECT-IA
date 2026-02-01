@@ -1,18 +1,18 @@
 import React, { useState } from "react";
 import { useStore } from "@/store/useStore";
-import { Icons } from "@/constants";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/Button";
 import { toast } from "sonner";
+import { Target, Sparkles, Wrench, CheckCircle, ChevronRight } from "lucide-react";
 
 const STEPS = [
-  { id: "dna", title: "DNA de Vendas", icon: Icons.Target, desc: "Configure o tom de voz da IA." },
-  { id: "birthub", title: "Inteligência", icon: Icons.Sparkles, desc: "Defina seus critérios de ICP." },
-  { id: "tools", title: "Ferramentas", icon: Icons.PowerTools, desc: "Ative os módulos essenciais." },
+  { id: "dna", title: "DNA de Vendas", icon: Target, desc: "Configure o tom de voz da IA." },
+  { id: "birthub", title: "Inteligência", icon: Sparkles, desc: "Defina seus critérios de ICP." },
+  { id: "tools", title: "Ferramentas", icon: Wrench, desc: "Ative os módulos essenciais." },
 ];
 
 export default function OnboardingWizard() {
-  const { userContext, completeOnboarding } = useStore();
+  const { completeOnboarding } = useStore();
   const [activeStep, setActiveStep] = useState(0);
 
   const handleNext = () => {
@@ -20,9 +20,7 @@ export default function OnboardingWizard() {
       setActiveStep(activeStep + 1);
     } else {
       completeOnboarding();
-      toast.success("Setup concluído! +10 Créditos adicionados.", {
-        icon: <Icons.Sparkles className="text-yellow-500" />,
-      });
+      toast.success("Setup concluído! +10 Créditos adicionados.");
     }
   };
 
@@ -43,7 +41,7 @@ export default function OnboardingWizard() {
                         className={`flex items-center gap-4 rounded-xl p-4 transition-all ${index === activeStep ? "bg-white shadow-lg dark:bg-slate-800" : "opacity-50"}`}
                     >
                         <div className={`flex h-10 w-10 items-center justify-center rounded-full ${index <= activeStep ? "bg-indigo-600 text-white" : "bg-slate-200 dark:bg-slate-700"}`}>
-                            {index < activeStep ? <Icons.CheckCircle size={20} /> : <step.icon size={20} />}
+                            {index < activeStep ? <CheckCircle size={20} /> : <step.icon size={20} />}
                         </div>
                         <div>
                             <p className="font-bold text-slate-900 dark:text-white">{step.title}</p>
@@ -71,7 +69,6 @@ export default function OnboardingWizard() {
                         </p>
 
                         <div className="aspect-video w-full rounded-2xl bg-slate-900/5 border border-slate-200 dark:border-slate-700 flex items-center justify-center relative overflow-hidden group cursor-pointer">
-                             {/* Placeholder de Vídeo */}
                              <div className="absolute inset-0 bg-gradient-to-tr from-indigo-900/20 to-transparent"></div>
                              <div className="h-16 w-16 bg-white rounded-full flex items-center justify-center shadow-lg z-10 group-hover:scale-110 transition-transform">
                                 <div className="ml-1 h-0 w-0 border-b-[10px] border-l-[16px] border-t-[10px] border-b-transparent border-l-indigo-600 border-t-transparent"></div>
@@ -85,7 +82,7 @@ export default function OnboardingWizard() {
             <div className="flex justify-end pt-8 border-t dark:border-slate-800">
                 <Button size="lg" onClick={handleNext} className="rounded-xl px-8 text-md">
                     {activeStep === STEPS.length - 1 ? "Concluir Setup" : "Próximo Passo"}
-                    <Icons.ChevronRight className="ml-2 h-5 w-5" />
+                    <ChevronRight className="ml-2 h-5 w-5" />
                 </Button>
             </div>
         </div>

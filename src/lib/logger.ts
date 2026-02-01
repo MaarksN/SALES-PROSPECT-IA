@@ -1,37 +1,34 @@
-/**
- * Logger Enterprise
- * - Esconde logs de debug em produção
- * - Adiciona timestamps e cores
- * - Tipagem segura
- */
+// Logger simples que pode ser expandido para Sentry/Datadog
+import { env } from "@/env";
 
 type LogLevel = "info" | "warn" | "error" | "debug";
 
-const IS_DEV = import.meta.env.DEV; // Vite env check
-
 class Logger {
-  private print(level: LogLevel, message: string, data?: any) {
-    if (!IS_DEV && level === "debug") return; // Silêncio em produção
+  log(level: LogLevel, message: string, meta?: Record<string, any>) {
+    if (level === "debug" && env.IS_PROD) return;
 
-    const timestamp = new Date().toLocaleTimeString("pt-BR");
-    const prefix = `[${timestamp}] [${level.toUpperCase()}]`;
+    const timestamp = new Date().toISOString();
+    const payload = { timestamp, level, message, ...meta };
 
-    const styles = {
-      info: "color: #3b82f6; font-weight: bold;",
-      warn: "color: #eab308; font-weight: bold;",
-      error: "color: #ef4444; font-weight: bold; background: #fee2e2; padding: 2px rounded;",
-      debug: "color: #a855f7; font-weight: normal;",
-    };
+    // Console local
+    if (level === "error") {
+        console.error(message, meta);
+    } else if (level === "warn") {
+        console.warn(message, meta);
+    } else {
+        console.log(message, meta);
+    }
 
-    console.groupCollapsed(`%c${prefix} ${message}`, styles[level]);
-    if (data) console.log(data);
-    console.groupEnd();
+    // Em produção, enviar para serviço externo
+    if (env.IS_PROD && env.VITE_SENTRY_DSN) {
+        // Sentry.captureMessage(message, { level, extra: meta });
+    }
   }
 
-  info(msg: string, data?: any) { this.print("info", msg, data); }
-  warn(msg: string, data?: any) { this.print("warn", msg, data); }
-  error(msg: string, data?: any) { this.print("error", msg, data); }
-  debug(msg: string, data?: any) { this.print("debug", msg, data); }
+  info(msg: string, meta?: any) { this.log("info", msg, meta); }
+  warn(msg: string, meta?: any) { this.log("warn", msg, meta); }
+  error(msg: string, meta?: any) { this.log("error", msg, meta); }
+  debug(msg: string, meta?: any) { this.log("debug", msg, meta); }
 }
 
 export const logger = new Logger();

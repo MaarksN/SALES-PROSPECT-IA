@@ -1,8 +1,8 @@
-import { z } from "zod";
-
 export const validate = (schema) => (req, res, next) => {
   try {
-    // Valida body, query e params combinados
+    // Normalização básica
+    if (req.body.email) req.body.email = req.body.email.toLowerCase().trim();
+
     schema.parse({
       body: req.body,
       query: req.query,
@@ -10,12 +10,10 @@ export const validate = (schema) => (req, res, next) => {
     });
     next();
   } catch (err) {
-    if (err instanceof z.ZodError) {
-      return res.status(400).json({
-        error: "Dados inválidos",
-        details: err.errors.map(e => `${e.path.join(".")}: ${e.message}`)
-      });
-    }
-    next(err);
+    // Erros de validação i18n friendly (código + path)
+    return res.status(400).json({
+        error: "Validation Error",
+        details: err.errors.map(e => ({ path: e.path, code: e.code, message: e.message }))
+    });
   }
 };

@@ -1,3 +1,6 @@
+// Cache simples de sessão para evitar hits excessivos no Supabase Auth
+const sessionCache = new Map(); // token -> { user, expiresAt }
+
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
 import path from "path";
@@ -9,51 +12,44 @@ dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
-
-// Check if we have valid credentials (and not just placeholders/empty)
 const isAuthEnabled = supabaseUrl && supabaseKey && !supabaseUrl.includes("placeholder");
 
 let supabase;
-if (isAuthEnabled) {
-  try {
-    supabase = createClient(supabaseUrl, supabaseKey);
-    console.log("✅ Supabase Auth configured.");
-  } catch (e) {
-    console.warn("⚠️ Failed to initialize Supabase client:", e.message);
-  }
-} else {
-  console.warn("⚠️ Supabase Credentials missing or placeholder. Running in DEMO MODE (No Auth enforcement).");
-}
+if (isAuthEnabled) supabase = createClient(supabaseUrl, supabaseKey);
 
 export const requireAuth = async (req, res, next) => {
-  if (!isAuthEnabled || !supabase) {
-    // Demo Mode: Mock user
+  if (!isAuthEnabled) {
     req.user = { id: "demo-user", email: "demo@example.com" };
     return next();
   }
 
   const authHeader = req.headers.authorization;
-
-  if (!authHeader) {
-    // In demo/dev mode, maybe we want to allow missing header too?
-    // But if auth IS enabled, we should enforce it.
-    return res.status(401).json({ error: "Token de acesso ausente." });
-  }
+  if (!authHeader) return res.status(401).json({ error: "Token required" });
 
   const token = authHeader.split(" ")[1];
 
+  // Cache Lookup
+  if (sessionCache.has(token)) {
+      const cached = sessionCache.get(token);
+      if (Date.now() < cached.expiresAt) {
+          req.user = cached.user;
+          return next();
+      }
+      sessionCache.delete(token);
+  }
+
   try {
     const { data: { user }, error } = await supabase.auth.getUser(token);
+    if (error || !user) throw new Error("Invalid Token");
 
-    if (error || !user) {
-      return res.status(403).json({ error: "Sessão inválida ou expirada." });
-    }
+    // Cache por 5 min
+    sessionCache.set(token, { user, expiresAt: Date.now() + 5 * 60 * 1000 });
 
-    // Anexa o usuário à requisição para uso nas rotas
     req.user = user;
     next();
   } catch (err) {
-    console.error("Erro na validação do token:", err);
-    return res.status(500).json({ error: "Falha na autenticação interna." });
+    console.error("Auth Error:", err.message);
+    // Erro genérico para segurança
+    return res.status(401).json({ error: "Unauthorized" });
   }
 };

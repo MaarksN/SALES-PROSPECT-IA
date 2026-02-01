@@ -1,9 +1,8 @@
 import React from "react";
-import { Lead } from "@/types";
-import { X, CheckCircle, Share2, Building, User, FileText } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/Button";
-import { motion, AnimatePresence } from "framer-motion";
-import { toast } from "sonner";
+import { Lead } from "@/types";
+import { Building2, Linkedin, Mail, MapPin, Calendar, Activity } from "lucide-react";
 
 interface LeadModalProps {
   lead: Lead | null;
@@ -13,67 +12,59 @@ interface LeadModalProps {
 export default function LeadModal({ lead, onClose }: LeadModalProps) {
   if (!lead) return null;
 
-  const handleCrmSync = () => {
-    toast.promise(new Promise(resolve => setTimeout(resolve, 2000)), {
-        loading: 'Enviando para HubSpot...',
-        success: 'Lead sincronizado com sucesso!',
-        error: 'Erro na conexão'
-    });
-  };
-
   return (
-    <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-        <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            className="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-900"
-        >
-          <div className="flex items-center justify-between border-b p-6 dark:border-slate-800">
+    <Dialog open={!!lead} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[600px] bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800">
+        <DialogHeader>
+          <div className="flex items-start gap-4">
+            <div className="h-12 w-12 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-xl">
+                {lead.name.charAt(0)}
+            </div>
             <div>
-                <h2 className="text-xl font-bold dark:text-white">Dossiê do Lead</h2>
-                <p className="text-sm text-slate-500">ID: {lead.id}</p>
+                <DialogTitle className="text-xl font-bold dark:text-white">{lead.name}</DialogTitle>
+                <DialogDescription className="text-slate-500">{lead.role} @ {lead.company}</DialogDescription>
             </div>
-            <button onClick={onClose} className="rounded-full p-2 hover:bg-slate-100 dark:hover:bg-slate-800">
-                <X size={20} />
-            </button>
+            <div className="ml-auto flex flex-col items-end">
+                <span className={`px-2 py-1 rounded text-xs font-bold ${
+                    lead.score > 80 ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
+                }`}>
+                    Score: {lead.score}
+                </span>
+            </div>
           </div>
+        </DialogHeader>
 
-          <div className="p-6 space-y-6">
+        <div className="grid gap-4 py-4">
             <div className="grid grid-cols-2 gap-4">
-                <div className="rounded-xl bg-slate-50 p-4 dark:bg-slate-800">
-                    <div className="mb-2 flex items-center gap-2 text-indigo-600 font-bold uppercase text-xs">
-                        <User size={14} /> Sobre
-                    </div>
-                    <p className="font-bold text-lg dark:text-white">{lead.name}</p>
-                    <p className="text-slate-500">{lead.role}</p>
+                <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                    <Mail size={16} className="text-slate-400"/> {lead.email || "Não disponível"}
                 </div>
-                <div className="rounded-xl bg-slate-50 p-4 dark:bg-slate-800">
-                    <div className="mb-2 flex items-center gap-2 text-indigo-600 font-bold uppercase text-xs">
-                        <Building size={14} /> Empresa
-                    </div>
-                    <p className="font-bold text-lg dark:text-white">{lead.company}</p>
-                    <p className="text-slate-500">{lead.location}</p>
+                <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                    <Linkedin size={16} className="text-slate-400"/> {lead.linkedin ? "Perfil LinkedIn" : "N/A"}
+                </div>
+                <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                    <Building2 size={16} className="text-slate-400"/> {lead.company}
+                </div>
+                <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                    <MapPin size={16} className="text-slate-400"/> {lead.location || "Remoto"}
                 </div>
             </div>
 
-            <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
-                <h3 className="mb-2 flex items-center gap-2 font-bold dark:text-white"><FileText size={16} /> Motivo do Match (IA)</h3>
-                <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
-                    {lead.fit_reason || "A IA identificou este lead como alta prioridade devido à expansão recente da empresa e compatibilidade com seu ICP definido no onboarding."}
+            <div className="mt-4 rounded-lg bg-slate-50 p-4 dark:bg-slate-800">
+                <h4 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white mb-2">
+                    <Activity size={16} className="text-indigo-500"/> Análise de Fit
+                </h4>
+                <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+                    {lead.fit_reason || "Empresa com alto crescimento recente e stack tecnológico compatível."}
                 </p>
             </div>
-          </div>
+        </div>
 
-          <div className="flex items-center justify-end gap-3 border-t bg-slate-50 p-6 dark:bg-slate-900 dark:border-slate-800">
-            <Button variant="outline" onClick={onClose}>Cancelar</Button>
-            <Button onClick={handleCrmSync} className="gap-2 bg-[#ff5c35] hover:bg-[#ff4015] text-white">
-                <Share2 size={16} /> Enviar para HubSpot
-            </Button>
-          </div>
-        </motion.div>
-      </div>
-    </AnimatePresence>
+        <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={onClose}>Fechar</Button>
+            <Button>Conectar no LinkedIn</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -1,6 +1,6 @@
 import React from "react";
-import { motion } from "framer-motion";
-import { TrendingUp, Users, DollarSign, Activity } from "lucide-react";
+import { useStore } from "@/store/useStore";
+import { Users, DollarSign, Activity, TrendingUp } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Button } from "@/components/ui/Button";
 
@@ -15,10 +15,7 @@ const data = [
 ];
 
 const StatCard = ({ title, value, icon: Icon, trend }: any) => (
-  <motion.div
-    whileHover={{ y: -5 }}
-    className="rounded-2xl bg-white p-6 shadow-sm border border-slate-100 dark:bg-slate-900 dark:border-slate-800"
-  >
+  <div className="rounded-2xl bg-white p-6 shadow-sm border border-slate-100 dark:bg-slate-900 dark:border-slate-800 transition-all hover:-translate-y-1">
     <div className="flex items-center justify-between">
       <div>
         <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{title}</p>
@@ -32,15 +29,23 @@ const StatCard = ({ title, value, icon: Icon, trend }: any) => (
       <span className="font-bold text-green-500">{trend}</span>
       <span className="ml-2 text-slate-400">vs. mês anterior</span>
     </div>
-  </motion.div>
+  </div>
 );
 
 export default function Dashboard() {
+  const { userContext } = useStore();
+
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
-      <div>
-        <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Visão Geral</h1>
-        <p className="text-slate-500">Monitoramento em tempo real do seu pipeline.</p>
+      <div className="flex justify-between items-center">
+        <div>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Olá, {userContext?.name.split(" ")[0]}</h1>
+            <p className="text-slate-500">Aqui está o pulso das suas vendas hoje.</p>
+        </div>
+        <div className="flex gap-2">
+            <Button variant="outline">Exportar Relatório</Button>
+            <Button>Nova Campanha</Button>
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
@@ -83,7 +88,7 @@ export default function Dashboard() {
                 <p className="text-sm font-bold uppercase tracking-wider opacity-70">Ação Recomendada</p>
                 <p className="mt-1 font-medium">Ativar campanha "Logística Enterprise"</p>
             </div>
-            <Button variant="secondary" className="mt-6 w-full text-indigo-700 font-bold">Executar Automação</Button>
+            <Button variant="secondary" className="mt-6 w-full text-indigo-700 font-bold bg-white hover:bg-slate-100">Executar Automação</Button>
         </div>
       </div>
     </div>

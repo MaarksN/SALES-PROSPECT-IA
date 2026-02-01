@@ -1,26 +1,35 @@
-import React from "react";
-import { Book } from "lucide-react";
+import React, { useState } from "react";
+import { Search } from "lucide-react";
 
 export default function WikiInterna() {
+  const [search, setSearch] = useState("");
+
+  const articles = [
+    { title: "Onboarding de Vendas", content: "Guia completo para novos SDRs..." },
+    { title: "Script de Cold Call", content: "Olá, falo com [Nome]? O motivo..." },
+    { title: "Objeções Comuns", content: "Como lidar com 'não tenho orçamento'..." },
+  ];
+
+  const filtered = articles.filter(a => a.title.toLowerCase().includes(search.toLowerCase()));
+
   return (
-    <div className="flex h-[80vh] gap-6">
-        <div className="w-64 border-r pr-6 dark:border-slate-800">
-            <h3 className="mb-4 flex items-center gap-2 font-bold dark:text-white"><Book size={16}/> Documentação</h3>
-            <ul className="space-y-2 text-sm text-slate-600 dark:text-slate-400">
-                <li className="font-bold text-indigo-600">Começando</li>
-                <li className="pl-4 hover:text-indigo-500 cursor-pointer">Instalação</li>
-                <li className="pl-4 hover:text-indigo-500 cursor-pointer">Configuração .env</li>
-                <li className="font-bold text-indigo-600 mt-4">API Reference</li>
-                <li className="pl-4 hover:text-indigo-500 cursor-pointer">/leads</li>
-                <li className="pl-4 hover:text-indigo-500 cursor-pointer">/auth</li>
-            </ul>
+    <div className="max-w-4xl mx-auto">
+        <div className="mb-8 relative">
+            <Search className="absolute left-4 top-3.5 text-slate-400" />
+            <input
+                placeholder="Buscar na base de conhecimento..."
+                className="w-full pl-12 pr-4 py-3 rounded-xl border bg-white dark:bg-slate-900 dark:border-slate-800"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+            />
         </div>
-        <div className="flex-1 prose dark:prose-invert">
-            <h1 className="text-3xl font-bold dark:text-white">Bem-vindo à Wiki</h1>
-            <p className="text-slate-500">Este é o centro de conhecimento do Sales Prospector v2.</p>
-            <hr className="my-6 border-slate-200 dark:border-slate-800"/>
-            <h2 className="text-xl font-bold dark:text-white">Arquitetura</h2>
-            <p className="text-slate-500">O sistema utiliza React 18, Vite e Supabase.</p>
+        <div className="grid gap-4">
+            {filtered.map((article, i) => (
+                <div key={i} className="bg-white p-6 rounded-xl border hover:shadow-md transition-shadow dark:bg-slate-900 dark:border-slate-800">
+                    <h3 className="text-xl font-bold mb-2 dark:text-white">{article.title}</h3>
+                    <p className="text-slate-500 line-clamp-2">{article.content}</p>
+                </div>
+            ))}
         </div>
     </div>
   );
