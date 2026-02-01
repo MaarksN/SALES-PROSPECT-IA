@@ -1,15 +1,36 @@
 import { api } from "@/lib/api";
 import { UserContext } from "@/types";
 
+// Cache em memória para evitar requests repetidos na mesma sessão
 const responseCache = new Map<string, string>();
 
+interface GenerateOptions {
+  temperature?: number;
+  stream?: boolean; // Preparação para futuro
+}
+
 class GeminiService {
-  constructor() {}
+  private SYSTEM_INSTRUCTION = `
+    Você é um SDR Senior (Sales Development Representative) especialista em vendas B2B.
+    Seu objetivo é criar conexões humanas, profissionais e persuasivas.
+    Use frameworks comprovados (AIDA, SPIN, GPCT).
+    Evite clichês de vendas e linguagem excessivamente formal ou robótica.
+    Sempre adapte o tom ao contexto da empresa do prospect.
+  `;
 
   // Método genérico para o AI Lab
-  async generateText(prompt: string): Promise<string> {
+  async generateText(prompt: string, options?: GenerateOptions): Promise<string> {
     try {
-      const response = await api.post("/ai/generate", { prompt });
+      const { temperature = 0.7 } = options || {};
+
+      const response = await api.post("/ai/generate", {
+        prompt,
+        systemInstruction: this.SYSTEM_INSTRUCTION,
+        config: {
+            temperature,
+            // stream: options?.stream
+        }
+      });
       return response.data.text;
     } catch (error) {
       console.error("Gemini Error:", error);
@@ -22,14 +43,17 @@ class GeminiService {
     if (responseCache.has(cacheKey)) return responseCache.get(cacheKey)!;
 
     const prompt = `
-      Atue como SDR Senior. Escreva um e-mail frio para ${leadName} da ${leadCompany}.
-      Vendo: ${context.myProduct}.
-      Contexto: ${context.myCompany}.
-      Tom: Profissional e Persuasivo.
-      Use Framework: AIDA.
+      Escreva um e-mail frio para ${leadName} da ${leadCompany}.
+      Eu vendo: ${context.myProduct}.
+      Minha empresa: ${context.myCompany}.
+
+      Framework: AIDA.
+      Tom: Profissional, mas conversacional.
+      Foco: Dor e Solução, não funcionalidades.
     `;
 
-    const text = await this.generateText(prompt);
+    // Emails criativos requerem temperatura maior
+    const text = await this.generateText(prompt, { temperature: 0.9 });
     responseCache.set(cacheKey, text);
     return text;
   }
@@ -41,7 +65,8 @@ class GeminiService {
     `;
 
     try {
-        const text = await this.generateText(prompt);
+        // Análise requer precisão, temperatura baixa
+        const text = await this.generateText(prompt, { temperature: 0.2 });
         const cleanText = text.replace(/```json|```/g, "").trim();
         return JSON.parse(cleanText);
     } catch (e) {

@@ -1,10 +1,15 @@
-import { ICrmProvider } from "./types";
+import { ICrmProvider, CRMContact } from "./types";
 import { HubSpotProvider } from "./HubSpotProvider";
-import { MockProvider } from "./MockProvider";
+import { MockCrmProvider } from "./MockProvider";
+import { env } from "@/env";
 
-export function getCrmProvider(): ICrmProvider {
-  // Para ativar o HubSpot real, defina VITE_ENABLE_REAL_CRM=true no .env
-  const useRealCrm = import.meta.env.VITE_ENABLE_REAL_CRM === "true";
-
-  return useRealCrm ? new HubSpotProvider() : new MockProvider();
+class CrmFactory {
+  static getProvider(): ICrmProvider {
+    if (env.VITE_ENABLE_REAL_CRM === "true" && env.VITE_HUBSPOT_TOKEN) {
+        return new HubSpotProvider();
+    }
+    return new MockCrmProvider();
+  }
 }
+
+export const crmService = CrmFactory.getProvider();

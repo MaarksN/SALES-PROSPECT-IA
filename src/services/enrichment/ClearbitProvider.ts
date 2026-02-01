@@ -1,39 +1,32 @@
-import { IEnrichmentProvider, EnrichedData } from "./types";
-import axios from "axios";
+import { EnrichmentProvider, EnrichmentData } from "./types";
+import { env } from "@/env";
+import { api } from "@/lib/api";
 
-export class ClearbitProvider implements IEnrichmentProvider {
-  private apiKey: string;
+export class ClearbitProvider implements EnrichmentProvider {
+  async enrichCompany(domain: string): Promise<EnrichmentData> {
+    if (!env.VITE_CLEARBIT_KEY) {
+        throw new Error("Clearbit API Key missing");
+    }
 
-  constructor() {
-    this.apiKey = import.meta.env.VITE_CLEARBIT_KEY || "";
+    // Proxy via backend to secure key
+    const response = await api.post("/enrichment/clearbit", { domain });
+    return response.data;
   }
+}
 
-  async enrichCompany(domain: string): Promise<EnrichedData> {
-    if (!this.apiKey) {
-      console.warn("Clearbit Key ausente. Retornando dados parciais.");
-      return {};
-    }
+export class MockEnrichmentProvider implements EnrichmentProvider {
+  async enrichCompany(domain: string): Promise<EnrichmentData> {
+    console.log(`[Enrichment Mock] Enriching ${domain}...`);
+    await new Promise(r => setTimeout(r, 800)); // Delay realista
 
-    try {
-      // Endpoint de Autocomplete da Clearbit (Gratuito para testes limitados ou pago)
-      // Ou usando a API de Enrichment via Proxy seguro
-      const response = await axios.get(`https://autocomplete.clearbit.com/v1/companies/suggest?query=${domain}`);
-
-      if (!response.data || response.data.length === 0) return {};
-
-      const data = response.data[0];
-
-      return {
-        foundedYear: undefined, // Clearbit autocomplete não retorna ano, Enrichment pago sim
-        employees: "N/A",
-        industry: data.domain,
-        location: data.name, // Simplificação
-        logo: data.logo,
-        linkedinUrl: undefined
-      };
-    } catch (error) {
-      console.error("Erro Clearbit:", error);
-      return {};
-    }
+    return {
+        revenue: "$10M - $50M",
+        employees: "50-200",
+        industry: "SaaS",
+        techStack: ["AWS", "React", "HubSpot"],
+        social: {
+            linkedin: `https://linkedin.com/company/${domain.split('.')[0]}`
+        }
+    };
   }
 }
