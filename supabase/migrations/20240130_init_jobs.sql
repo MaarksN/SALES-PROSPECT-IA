@@ -1,28 +1,20 @@
--- 1. Enum para status do job
-DO $$ BEGIN
-    CREATE TYPE job_status AS ENUM ('pending', 'processing', 'completed', 'failed');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
--- 2. Tabela de Jobs (Fila)
-CREATE TABLE IF NOT EXISTS public.jobs (
-  id uuid default gen_random_uuid() primary key,
-  user_id uuid references auth.users not null,
-  type text not null,
-  payload jsonb not null,
-  status job_status default 'pending',
-  result jsonb,
-  error_message text,
-  created_at timestamptz default now(),
-  updated_at timestamptz default now()
+CREATE TABLE IF NOT EXISTS jobs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  queue TEXT NOT NULL DEFAULT 'default',
+  type TEXT NOT NULL, -- e.g., 'enrich_lead', 'send_email'
+  payload JSONB NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed', 'cancelled')),
+  priority INTEGER DEFAULT 0, -- Maior número = maior prioridade
+  attempts INTEGER DEFAULT 0,
+  max_attempts INTEGER DEFAULT 3,
+  last_error TEXT,
+  run_at TIMESTAMPTZ DEFAULT NOW(), -- Agendamento
+  started_at TIMESTAMPTZ,
+  finished_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 3. Segurança (RLS)
-ALTER TABLE public.jobs ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Users manage own jobs" ON public.jobs;
-CREATE POLICY "Users manage own jobs"
-ON public.jobs
-FOR ALL
-USING (auth.uid() = user_id);
+-- Índices para performance do Worker
+CREATE INDEX IF NOT EXISTS idx_jobs_status_run_at_priority ON jobs(status, run_at, priority DESC);
+CREATE INDEX IF NOT EXISTS idx_jobs_type ON jobs(type);

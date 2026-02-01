@@ -1,62 +1,38 @@
+import { crmService } from "./crm/CrmFactory";
 import { Lead } from "@/types";
-import { env } from "@/env";
-import axios from "axios";
-import { toast } from "sonner";
+import { CRMContact } from "./crm/types";
 
-interface CRMResponse {
-  success: boolean;
-  message: string;
-  crmId?: string;
+// Mapper de Lead para CRMContact (Normalização)
+function mapLeadToContact(lead: Lead): CRMContact {
+  const [firstName, ...rest] = lead.name.split(" ");
+  return {
+    firstName: firstName || "",
+    lastName: rest.join(" ") || "",
+    email: lead.email || "",
+    company: lead.company,
+    jobTitle: lead.role,
+    website: lead.linkedin,
+    source: "prospector-v2"
+  };
 }
 
-class CRMService {
-  async syncToHubspot(lead: Lead): Promise<CRMResponse> {
-    if (!env.VITE_HUBSPOT_TOKEN) {
-        return { success: false, message: "Token do HubSpot não configurado no .env" };
+// Wrapper de alto nível com Auditoria
+export const syncLead = async (lead: Lead) => {
+    console.log(`[Audit] Syncing lead ${lead.id} to CRM...`);
+
+    if (!lead.email) {
+        return { success: false, message: "Lead sem email não pode ser sincronizado." };
     }
 
-    try {
-      // API Real do HubSpot
-      const response = await axios.post(
-        "https://api.hubapi.com/crm/v3/objects/contacts",
-        {
-          properties: {
-            email: lead.email,
-            firstname: lead.name.split(" ")[0],
-            lastname: lead.name.split(" ").slice(1).join(" "),
-            company: lead.company,
-            jobtitle: lead.role,
-            website: lead.linkedin
-          }
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${env.VITE_HUBSPOT_TOKEN}`,
-            "Content-Type": "application/json"
-          }
-        }
-      );
+    const contact = mapLeadToContact(lead);
+    const result = await crmService.createContact(contact);
 
-      return {
-        success: true,
-        message: "Lead criado no HubSpot!",
-        crmId: response.data.id
-      };
-
-    } catch (error: any) {
-      console.error("HubSpot API Error:", error.response?.data || error.message);
-
-      if (error.response?.status === 409) {
-          return { success: false, message: "Este contato já existe no HubSpot." };
-      }
-      return { success: false, message: "Erro na API do HubSpot. Verifique o console." };
+    if (result.success) {
+        console.log(`[Audit] Sync Success: ${result.crmId}`);
+        // Aqui chamaria update de status no DB local
+    } else {
+        console.error(`[Audit] Sync Failed: ${result.message}`);
     }
-  }
 
-  // Pipedrive requer lógica similar, deixamos preparado
-  async syncToPipedrive(lead: Lead): Promise<CRMResponse> {
-    return { success: false, message: "Integração Pipedrive pendente de Token." };
-  }
-}
-
-export const crmService = new CRMService();
+    return result;
+};

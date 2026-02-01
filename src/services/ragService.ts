@@ -1,34 +1,58 @@
-import { createClient } from "@supabase/supabase-js";
-import { env } from "@/env";
+import { api } from "@/lib/api";
 
-const supabase = createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY);
+interface ContextDocument {
+  id: string;
+  content: string;
+  relevanceScore: number;
+  metadata: Record<string, any>;
+}
 
-export const ragService = {
-  async searchContext(query: string): Promise<string> {
-    // 1. Gera Embedding da Query usando Gemini (Real)
-    // Nota: Requer que o modelo "text-embedding-004" esteja habilitado na sua chave
-    // Para simplificar este MVP, pularemos a geração do embedding no frontend
-    // e chamaremos uma RPC que faria isso ou uma busca full-text.
-
+class RagService {
+  // Simula busca vetorial (em produção chamaria endpoint /api/rag/search)
+  async retrieveContext(query: string, filters?: Record<string, any>): Promise<string> {
     try {
-        // Chamada Real ao Postgres (pgvector)
-        // Você precisa criar a função 'match_documents' no seu Supabase
-        const { data, error } = await supabase.rpc('match_documents', {
-            query_text: query, // Se usar Full Text Search
-            match_threshold: 0.7,
-            match_count: 5
-        });
+        // Exemplo de chamada real futura:
+        // const docs = await api.post("/rag/search", { query, filters });
 
-        if (error) {
-            console.warn("RAG Error (RPC não encontrada?):", error.message);
-            return "";
-        }
+        // Mock para ciclo atual
+        const docs: ContextDocument[] = [
+            {
+                id: "1",
+                content: "Nossa empresa foca em reduzir CAC em 30%.",
+                relevanceScore: 0.95,
+                metadata: { type: "case_study" }
+            },
+            {
+                id: "2",
+                content: "Temos integração nativa com HubSpot.",
+                relevanceScore: 0.88,
+                metadata: { type: "feature" }
+            }
+        ];
 
-        if (!data || data.length === 0) return "";
+        // Filtra por relevância mínima (0.8)
+        const relevantDocs = docs.filter(d => d.relevanceScore > 0.8);
 
-        return data.map((d: any) => d.content).join("\n\n");
-    } catch (err) {
+        if (relevantDocs.length === 0) return "";
+
+        // Formata Context Injection
+        return `
+        CONTEXTO CONHECIMENTO INTERNO (Use se relevante):
+        ${relevantDocs.map(d => `- ${d.content}`).join("\n")}
+        `;
+
+    } catch (error) {
+        console.warn("RAG retrieval failed, proceeding without context.");
         return "";
     }
   }
-};
+
+  async enrichPromptWithContext(basePrompt: string, query: string): Promise<string> {
+    const context = await this.retrieveContext(query);
+    if (!context) return basePrompt;
+
+    return `${context}\n\nINSTRUÇÃO DO USUÁRIO:\n${basePrompt}`;
+  }
+}
+
+export const ragService = new RagService();

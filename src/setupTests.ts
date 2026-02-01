@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import "@testing-library/jest-dom";
 import { vi, afterEach } from "vitest";
 
@@ -17,7 +16,3 @@ window.HTMLElement.prototype.scrollIntoView = function() {};
 afterEach(() => {
   vi.clearAllMocks();
 });
-=======
-import '@testing-library/jest-dom';
-// Mocks will be added here
->>>>>>> main

@@ -1,6 +1,20 @@
-import { Lead } from "@/types";
+export interface CRMContact {
+  email: string;
+  firstName: string;
+  lastName: string;
+  company?: string;
+  jobTitle?: string;
+  website?: string;
+  phone?: string;
+  source: "prospector-v2";
+}
+
+export interface CRMResponse {
+  success: boolean;
+  crmId?: string;
+  message: string;
+}
 
 export interface ICrmProvider {
-  name: string;
-  sendLead(lead: Lead): Promise<{ success: boolean; id?: string; message?: string }>;
+  createContact(contact: CRMContact): Promise<CRMResponse>;
 }

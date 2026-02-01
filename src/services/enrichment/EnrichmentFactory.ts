@@ -1,20 +1,20 @@
-import { IEnrichmentProvider } from "./types";
-import { ClearbitProvider } from "./ClearbitProvider";
+import { EnrichmentProvider } from "./types";
+import { ClearbitProvider, MockEnrichmentProvider } from "./ClearbitProvider";
+import { env } from "@/env";
 
-// Mock Fallback inteligente (Scraping simulado localmente se não houver chave)
-class LocalFallbackProvider implements IEnrichmentProvider {
-  async enrichCompany(domain: string) {
-    // Simula delay de rede real
-    await new Promise(r => setTimeout(r, 800));
-    return {
-      industry: "Simulated Real-Time Data",
-      employees: "10-50",
-      location: "Internet"
-    };
+class EnrichmentFactory {
+  static getProvider(): EnrichmentProvider {
+    // Audit decision log
+    const useRealProvider = env.VITE_ENABLE_REAL_CRM === "true" && !!env.VITE_CLEARBIT_KEY;
+
+    if (useRealProvider) {
+      console.debug("[EnrichmentFactory] Using Real Provider (Clearbit)");
+      return new ClearbitProvider();
+    }
+
+    console.debug("[EnrichmentFactory] Using Mock Provider (Dev Mode or Missing Keys)");
+    return new MockEnrichmentProvider();
   }
 }
 
-export function getEnrichmentProvider(): IEnrichmentProvider {
-  const hasKey = !!import.meta.env.VITE_CLEARBIT_KEY;
-  return hasKey ? new ClearbitProvider() : new LocalFallbackProvider();
-}
+export const enrichmentService = EnrichmentFactory.getProvider();

@@ -1,13 +1,19 @@
-import { ICrmProvider } from "./types";
-import { Lead } from "@/types";
-import { toast } from "sonner";
+import { ICrmProvider, CRMContact, CRMResponse } from "./types";
 
-export class MockProvider implements ICrmProvider {
-  name = "MockCRM";
+export class MockCrmProvider implements ICrmProvider {
+  private localQueue: CRMContact[] = [];
 
-  async sendLead(lead: Lead) {
-    await new Promise(r => setTimeout(r, 1000));
-    toast.info(`[MOCK] Lead ${lead.name} sincronizado (Simulação).`);
-    return { success: true, id: "mock_id", message: "Simulação OK" };
+  async createContact(contact: CRMContact): Promise<CRMResponse> {
+    console.log("[CRM Mock] Queuing contact locally:", contact.email);
+    this.localQueue.push(contact);
+
+    // Simula delay e sucesso
+    await new Promise(r => setTimeout(r, 600));
+
+    return {
+        success: true,
+        crmId: `mock_${Date.now()}`,
+        message: "Contact synced to Mock CRM"
+    };
   }
 }

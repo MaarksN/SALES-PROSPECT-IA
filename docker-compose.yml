@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 version: "3.8"
 
 services:
@@ -71,57 +70,3 @@ services:
 networks:
   prospector-net:
     driver: bridge
-=======
-version: '3.8'
-
-services:
-  frontend:
-    build: .
-    ports:
-      - "3000:3000"
-    depends_on:
-      - backend
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
-
-  backend:
-    build: ./server
-    ports:
-      - "3001:3001"
-    environment:
-      - PORT=3001
-      # Assuming standard Postgres for demo, replace with Supabase credentials if needed
-      - DATABASE_URL=postgres://postgres:postgres@db:5432/postgres
-    depends_on:
-      db:
-        condition: service_healthy
-    volumes:
-      - ./server/logs:/app/logs
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
-
-  db:
-    image: postgres:15-alpine
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: postgres
-    ports:
-      - "5432:5432"
-    volumes:
-      - db_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-volumes:
-  db_data:
->>>>>>> main

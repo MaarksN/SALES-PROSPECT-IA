@@ -1,13 +1,14 @@
-export interface EnrichedData {
-  foundedYear?: number;
+export interface EnrichmentData {
+  revenue?: string;
   employees?: string;
   industry?: string;
-  linkedinUrl?: string;
-  location?: string;
-  logo?: string;
   techStack?: string[];
+  social?: {
+    linkedin?: string;
+    twitter?: string;
+  };
 }
 
-export interface IEnrichmentProvider {
-  enrichCompany(domain: string): Promise<EnrichedData>;
+export interface EnrichmentProvider {
+  enrichCompany(domain: string): Promise<EnrichmentData>;
 }
