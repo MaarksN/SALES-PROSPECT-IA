@@ -1,20 +1,59 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Sales Prospector v2 (Versão Final)
 
-# Run and deploy your AI Studio app
+## Visão Geral
+Plataforma completa de Inteligência de Vendas (SaaS), construída com arquitetura escalável e segura.
 
-This contains everything you need to run your app locally.
+## Arquitetura
+- **Frontend:** React 18, Vite, Tailwind CSS, Zustand, React Query.
+- **Backend (BFF):** Node.js, Express, Security Hardening (Helmet, Rate Limit).
+- **Banco de Dados:** Supabase (PostgreSQL) com RLS e Billing integrado.
+- **IA:** Google Gemini 1.5 Flash via Proxy Seguro.
+- **Infra:** Docker Compose (API + Worker + Frontend).
 
-View your app in AI Studio: https://ai.studio/apps/drive/1P3Pvtsniir4KYkjfQSOWPZlYZAXEx1PC
+## Como Rodar (Quick Start)
 
-## Run Locally
+### Pré-requisitos
+- Node.js 20+
+- Docker & Docker Compose
 
-**Prerequisites:**  Node.js
+### Instalação
+1. Clone o repositório.
+2. Copie o arquivo de ambiente:
+   ```bash
+   cp .env.example .env
+   ```
+3. Instale as dependências:
+   ```bash
+   npm install
+   cd server && npm install && cd ..
+   ```
 
+### Execução em Desenvolvimento
+Para rodar frontend e backend localmente:
+```bash
+npm run dev
+# Em outro terminal:
+npm run server
+```
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+### Execução via Docker (Produção/Simulação)
+```bash
+docker-compose up --build
+```
+Acesse: `http://localhost:80` (Frontend) e `http://localhost:3001` (Backend).
+
+## Funcionalidades Principais
+- **Dashboard:** Métricas em tempo real e gráficos interativos.
+- **Meus Leads:** Gestão de leads com pontuação e status.
+- **AI Lab:** Geração de e-mails frios e análise de fit via IA (Mock ou Real).
+- **Ferramentas:** Kanban, Calculadora ROI, Testador de API.
+- **Segurança:** Autenticação via Supabase, Proteção de Rotas, Logs de Auditoria.
+
+## Estrutura de Pastas
+- `/src`: Código fonte Frontend.
+- `/server`: Código fonte Backend (BFF e Workers).
+- `/supabase`: Migrations e configurações de banco.
+- `/e2e`: Testes End-to-End (Playwright).
+
+---
+**Status:** Production Ready (Ciclos 1-12 Concluídos)
