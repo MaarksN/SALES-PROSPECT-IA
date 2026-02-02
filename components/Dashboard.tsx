@@ -1,6 +1,9 @@
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, rectSortingStrategy } from '@dnd-kit/sortable';
+import { SortableWidget } from './SortableWidget';
 import { SavedGen } from '../types';
 import { Icons } from '../constants';
 import { useStore } from '../store/useStore';
@@ -21,6 +24,23 @@ const COLORS = ['#8b5cf6', '#f59e0b', '#3b82f6', '#ec4899'];
 const Dashboard: React.FC = () => {
   const leads = useStore(state => state.leads);
   const [savedGens] = useLocalStorage<SavedGen[]>('sales_ai_history', []);
+  const [widgetOrder, setWidgetOrder] = useLocalStorage<string[]>('dashboard_widgets_order', ['kpi1', 'kpi2', 'kpi3', 'kpi4']);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleDragEnd = (event: any) => {
+    const { active, over } = event;
+    if (active.id !== over.id) {
+        setWidgetOrder((items) => {
+            const oldIndex = items.indexOf(active.id);
+            const newIndex = items.indexOf(over.id);
+            return arrayMove(items, oldIndex, newIndex);
+        });
+    }
+  };
 
   // Compute Stats from Real Store Data
   const stats = useMemo(() => {
@@ -66,76 +86,84 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
       
-      {/* KPI Cards - Glassmorphism & Gradients */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {/* Card 1 */}
-        <div className="relative overflow-hidden bg-white dark:bg-[#0F1629] p-8 rounded-[2rem] shadow-xl border border-slate-100 dark:border-white/5 group hover:scale-[1.02] transition-transform">
-          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-              <div className="bg-blue-500 w-24 h-24 rounded-full blur-2xl"></div>
-          </div>
-          <div className="relative z-10">
-            <div className="flex justify-between items-start mb-4">
-                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-2xl text-blue-600 dark:text-blue-400">
-                    <Icons.Leads />
-                </div>
-                <span className="text-xs font-bold text-green-500 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-lg">+12%</span>
+      {/* KPI Cards - Drag & Drop */}
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={widgetOrder} strategy={rectSortingStrategy}>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                {widgetOrder.map(id => {
+                    if (id === 'kpi1') return (
+                        <SortableWidget key={id} id={id}>
+                            <div className="h-full relative overflow-hidden bg-white dark:bg-[#0F1629] p-8 rounded-[2rem] shadow-xl border border-slate-100 dark:border-white/5 group hover:scale-[1.02] transition-transform cursor-grab active:cursor-grabbing">
+                                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                                    <div className="bg-blue-500 w-24 h-24 rounded-full blur-2xl"></div>
+                                </div>
+                                <div className="relative z-10">
+                                    <div className="flex justify-between items-start mb-4">
+                                        <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-2xl text-blue-600 dark:text-blue-400"><Icons.Leads /></div>
+                                        <span className="text-xs font-bold text-green-500 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-lg">+12%</span>
+                                    </div>
+                                    <p className="text-slate-500 dark:text-slate-400 font-medium mb-1">Total de Leads</p>
+                                    <p className="text-4xl font-black text-slate-800 dark:text-white">{stats.totalLeads}</p>
+                                </div>
+                            </div>
+                        </SortableWidget>
+                    );
+                    if (id === 'kpi2') return (
+                        <SortableWidget key={id} id={id}>
+                            <div className="h-full relative overflow-hidden bg-white dark:bg-[#0F1629] p-8 rounded-[2rem] shadow-xl border border-slate-100 dark:border-white/5 group hover:scale-[1.02] transition-transform cursor-grab active:cursor-grabbing">
+                                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                                    <div className="bg-amber-500 w-24 h-24 rounded-full blur-2xl"></div>
+                                </div>
+                                <div className="relative z-10">
+                                    <div className="flex justify-between items-start mb-4">
+                                        <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-2xl text-amber-600 dark:text-amber-400"><Icons.Sparkles /></div>
+                                        <span className="text-xs font-bold text-green-500 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-lg">+8%</span>
+                                    </div>
+                                    <p className="text-slate-500 dark:text-slate-400 font-medium mb-1">Qualificados (IA)</p>
+                                    <p className="text-4xl font-black text-slate-800 dark:text-white">{stats.qualifiedLeads}</p>
+                                </div>
+                            </div>
+                        </SortableWidget>
+                    );
+                    if (id === 'kpi3') return (
+                        <SortableWidget key={id} id={id}>
+                            <div className="h-full relative overflow-hidden bg-white dark:bg-[#0F1629] p-8 rounded-[2rem] shadow-xl border border-slate-100 dark:border-white/5 group hover:scale-[1.02] transition-transform cursor-grab active:cursor-grabbing">
+                                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                                    <div className="bg-purple-500 w-24 h-24 rounded-full blur-2xl"></div>
+                                </div>
+                                <div className="relative z-10">
+                                    <div className="flex justify-between items-start mb-4">
+                                        <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-2xl text-purple-600 dark:text-purple-400"><Icons.Kanban /></div>
+                                        <span className="text-xs font-bold text-red-500 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded-lg">-2%</span>
+                                    </div>
+                                    <p className="text-slate-500 dark:text-slate-400 font-medium mb-1">Taxa de Conversão</p>
+                                    <p className="text-4xl font-black text-slate-800 dark:text-white">{stats.conversionRate}%</p>
+                                </div>
+                            </div>
+                        </SortableWidget>
+                    );
+                    if (id === 'kpi4') return (
+                        <SortableWidget key={id} id={id}>
+                            <div className="h-full relative overflow-hidden bg-gradient-to-br from-slate-900 to-slate-800 text-white p-8 rounded-[2rem] shadow-2xl border border-white/10 group hover:scale-[1.02] transition-transform cursor-grab active:cursor-grabbing">
+                                <div className="absolute -top-10 -right-10 w-40 h-40 bg-gradient-to-br from-amber-400 to-orange-600 rounded-full blur-3xl opacity-30"></div>
+                                <div className="relative z-10">
+                                    <div className="flex justify-between items-start mb-4">
+                                        <div className="p-3 bg-white/10 rounded-2xl text-amber-400 backdrop-blur-md"><span className="text-xl font-bold">$</span></div>
+                                        <span className="text-xs font-bold text-amber-300 bg-amber-900/50 px-2 py-1 rounded-lg border border-amber-500/30">Pipeline</span>
+                                    </div>
+                                    <p className="text-slate-300 font-medium mb-1">Receita Projetada</p>
+                                    <p className="text-3xl font-black bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">
+                                        R$ {stats.projectedRevenue.toLocaleString('pt-BR', { notation: "compact" })}
+                                    </p>
+                                </div>
+                            </div>
+                        </SortableWidget>
+                    );
+                    return null;
+                })}
             </div>
-            <p className="text-slate-500 dark:text-slate-400 font-medium mb-1">Total de Leads</p>
-            <p className="text-4xl font-black text-slate-800 dark:text-white">{stats.totalLeads}</p>
-          </div>
-        </div>
-
-        {/* Card 2 */}
-        <div className="relative overflow-hidden bg-white dark:bg-[#0F1629] p-8 rounded-[2rem] shadow-xl border border-slate-100 dark:border-white/5 group hover:scale-[1.02] transition-transform">
-          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-              <div className="bg-amber-500 w-24 h-24 rounded-full blur-2xl"></div>
-          </div>
-          <div className="relative z-10">
-            <div className="flex justify-between items-start mb-4">
-                <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-2xl text-amber-600 dark:text-amber-400">
-                    <Icons.Sparkles />
-                </div>
-                <span className="text-xs font-bold text-green-500 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-lg">+8%</span>
-            </div>
-            <p className="text-slate-500 dark:text-slate-400 font-medium mb-1">Qualificados (IA)</p>
-            <p className="text-4xl font-black text-slate-800 dark:text-white">{stats.qualifiedLeads}</p>
-          </div>
-        </div>
-
-        {/* Card 3 */}
-        <div className="relative overflow-hidden bg-white dark:bg-[#0F1629] p-8 rounded-[2rem] shadow-xl border border-slate-100 dark:border-white/5 group hover:scale-[1.02] transition-transform">
-          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-              <div className="bg-purple-500 w-24 h-24 rounded-full blur-2xl"></div>
-          </div>
-          <div className="relative z-10">
-            <div className="flex justify-between items-start mb-4">
-                <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-2xl text-purple-600 dark:text-purple-400">
-                    <Icons.Kanban />
-                </div>
-                <span className="text-xs font-bold text-red-500 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded-lg">-2%</span>
-            </div>
-            <p className="text-slate-500 dark:text-slate-400 font-medium mb-1">Taxa de Conversão</p>
-            <p className="text-4xl font-black text-slate-800 dark:text-white">{stats.conversionRate}%</p>
-          </div>
-        </div>
-
-        {/* Card 4 - Revenue */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 to-slate-800 text-white p-8 rounded-[2rem] shadow-2xl border border-white/10 group hover:scale-[1.02] transition-transform">
-          <div className="absolute -top-10 -right-10 w-40 h-40 bg-gradient-to-br from-amber-400 to-orange-600 rounded-full blur-3xl opacity-30"></div>
-          <div className="relative z-10">
-            <div className="flex justify-between items-start mb-4">
-                <div className="p-3 bg-white/10 rounded-2xl text-amber-400 backdrop-blur-md">
-                    <span className="text-xl font-bold">$</span>
-                </div>
-                <span className="text-xs font-bold text-amber-300 bg-amber-900/50 px-2 py-1 rounded-lg border border-amber-500/30">Pipeline</span>
-            </div>
-            <p className="text-slate-300 font-medium mb-1">Receita Projetada</p>
-            <p className="text-3xl font-black bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">
-                R$ {stats.projectedRevenue.toLocaleString('pt-BR', { notation: "compact" })}
-            </p>
-          </div>
-        </div>
-      </div>
+        </SortableContext>
+      </DndContext>
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

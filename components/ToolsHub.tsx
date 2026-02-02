@@ -94,6 +94,7 @@ const ToolsHub: React.FC = () => {
   const [formValues, setFormValues] = useState<Record<string, string>>({});
   const [result, setResult] = useState<string | null>(null);
   const [showContextModal, setShowContextModal] = useState(false);
+  const [comparisonMode, setComparisonMode] = useState<SavedGen | null>(null);
 
   // Context Form State
   const [tempContext, setTempContext] = useState<UserContext>({
@@ -144,6 +145,7 @@ const ToolsHub: React.FC = () => {
     setResult(null);
     setFormValues({});
     setViewMode('tools');
+    setComparisonMode(null);
     mutation.reset();
   };
 
@@ -420,6 +422,9 @@ const ToolsHub: React.FC = () => {
                                         <Icons.Check className="text-green-500" /> Resultado Gerado:
                                     </h3>
                                     <div className="flex gap-2">
+                                        {comparisonMode && (
+                                            <button onClick={() => setComparisonMode(null)} className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg">Fechar Comparação</button>
+                                        )}
                                         <button 
                                             onClick={handleSaveResult}
                                             className="text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
@@ -440,9 +445,23 @@ const ToolsHub: React.FC = () => {
                                         </button>
                                     </div>
                                 </div>
-                                <div className="bg-slate-50 dark:bg-[#05050A] p-6 rounded-xl border border-slate-200 dark:border-slate-700 prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap overflow-auto max-h-[500px] shadow-inner">
-                                    {result}
-                                </div>
+
+                                {comparisonMode ? (
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="bg-red-50 dark:bg-red-900/10 p-4 rounded-xl border border-red-200 dark:border-red-900">
+                                            <div className="text-xs font-bold text-red-500 mb-2">VERSÃO ANTERIOR ({new Date(comparisonMode.timestamp).toLocaleDateString()})</div>
+                                            <div className="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap">{comparisonMode.output}</div>
+                                        </div>
+                                        <div className="bg-green-50 dark:bg-green-900/10 p-4 rounded-xl border border-green-200 dark:border-green-900">
+                                            <div className="text-xs font-bold text-green-600 mb-2">NOVA VERSÃO</div>
+                                            <div className="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap">{result}</div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="bg-slate-50 dark:bg-[#05050A] p-6 rounded-xl border border-slate-200 dark:border-slate-700 prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap overflow-auto max-h-[500px] shadow-inner">
+                                        {result}
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
@@ -479,6 +498,18 @@ const ToolsHub: React.FC = () => {
                               {gen.output}
                           </div>
                           <div className="flex justify-end gap-2">
+                              <button onClick={() => {
+                                  // Restore tool and context
+                                  const tool = TOOLS_REGISTRY.find(t => t.id === gen.toolId);
+                                  if (tool) {
+                                      setActiveTool(tool);
+                                      setFormValues(gen.inputs);
+                                      setResult(null); // Reset result to force generation or we could set result = gen.output but the goal is comparison
+                                      setComparisonMode(gen);
+                                      setViewMode('tools');
+                                      toast("Modo de Comparação Ativado. Gere novamente para ver a diferença.", { icon: '⚖️' });
+                                  }
+                              }} className="text-xs font-bold px-3 py-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg dark:bg-indigo-900/20 dark:text-indigo-300">Comparar / Editar</button>
                               <button onClick={() => {navigator.clipboard.writeText(gen.output); toast.success('Copiado!')}} className="text-xs font-bold px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg dark:bg-slate-700 dark:hover:bg-slate-600">Copiar</button>
                           </div>
                       </div>

@@ -1,9 +1,10 @@
 
 import React, { useState } from 'react';
 import { Icons } from '../constants';
+import CRMConnectors from './CRMConnectors';
 
 const BusinessFeatures: React.FC = () => {
-    const [tab, setTab] = useState<'affiliates' | 'enterprise' | 'marketplace'>('affiliates');
+    const [tab, setTab] = useState<'affiliates' | 'enterprise' | 'marketplace' | 'crm'>('affiliates');
 
     return (
         <div className="animate-in fade-in space-y-8 pb-20">
@@ -30,6 +31,12 @@ const BusinessFeatures: React.FC = () => {
                     className={`px-6 py-3 font-bold rounded-t-xl transition-all ${tab === 'marketplace' ? 'bg-indigo-50 border-b-2 border-indigo-600 text-indigo-700 dark:bg-slate-800 dark:text-indigo-400' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
                 >
                     Marketplace
+                </button>
+                <button
+                    onClick={() => setTab('crm')}
+                    className={`px-6 py-3 font-bold rounded-t-xl transition-all ${tab === 'crm' ? 'bg-indigo-50 border-b-2 border-indigo-600 text-indigo-700 dark:bg-slate-800 dark:text-indigo-400' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                >
+                    Integrações
                 </button>
             </div>
 
@@ -120,6 +127,8 @@ const BusinessFeatures: React.FC = () => {
                         </div>
                     </div>
                 )}
+
+                {tab === 'crm' && <CRMConnectors />}
             </div>
         </div>
     );
