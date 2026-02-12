@@ -69,7 +69,10 @@ class AutopilotService {
 
     } catch (error) {
         console.error("Batch processing failed:", error);
-        // TODO: Lógica de compensação de créditos aqui
+        // Lógica de compensação de créditos
+        const totalRefund = batch.reduce((acc, task) => acc + this.getCost(task.type), 0);
+        useStore.getState().addCredits(totalRefund);
+        console.log(`[Autopilot] Refunded ${totalRefund} credits due to batch failure.`);
     } finally {
         this.isProcessing = false;
         // Se sobrou algo, processa o resto
