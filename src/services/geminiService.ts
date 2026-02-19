@@ -1,8 +1,9 @@
 import { api } from "@/lib/api";
 import { UserContext } from "@/types";
+import { SimpleLRUCache } from "@/lib/cache";
 
-// Cache em memória para evitar requests repetidos na mesma sessão
-const responseCache = new Map<string, string>();
+// Cache em memória para evitar requests repetidos na mesma sessão (limite de 50 entradas)
+const responseCache = new SimpleLRUCache<string, string>(50);
 
 interface GenerateOptions {
   temperature?: number;

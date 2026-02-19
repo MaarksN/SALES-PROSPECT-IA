@@ -1,9 +1,10 @@
 import axios, { AxiosRequestConfig } from "axios";
 import { env } from "@/env";
 import { createClient } from "@supabase/supabase-js";
+import { SimpleLRUCache } from "./cache";
 
-// Cache simples em memória para GETs
-const cache = new Map<string, { data: any, timestamp: number }>();
+// Cache simples em memória para GETs (limite de 100 entradas)
+const cache = new SimpleLRUCache<string, { data: any, timestamp: number }>(100);
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
 
 const supabase = createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY);
